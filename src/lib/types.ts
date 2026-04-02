@@ -9,6 +9,7 @@ export interface Employee {
 
 export interface ApiResponse {
   success: boolean;
+  error?: string;
   dates: string[];
   employees: Employee[];
   totalEmployees: number;

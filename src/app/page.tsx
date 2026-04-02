@@ -11,7 +11,7 @@ import ComplianceTracker from "@/components/ComplianceTracker";
 import TeamBreakdown from "@/components/TeamBreakdown";
 import EmployeeDetail from "@/components/EmployeeDetail";
 import { DailyTrendChart, StatusPieChart, TeamComplianceChart, WeeklyOfficeTrend } from "@/components/Charts";
-import { MapPin, BarChart3, Users, ShieldCheck, Download, Sun, Moon, TrendingUp, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { MapPin, BarChart3, Users, ShieldCheck, Download, Sun, Moon, TrendingUp, RefreshCw, AlertCircle } from "lucide-react";
 
 type Tab = "overview" | "compliance" | "team" | "trends";
 
@@ -108,10 +108,43 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={32} className="animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading data from MissionHQ...</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
+        {/* Skeleton header */}
+        <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 px-6 py-4">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div className="shimmer-bar h-7 w-40 rounded-lg" />
+            <div className="flex gap-3">
+              <div className="shimmer-bar h-9 w-24 rounded-lg" />
+              <div className="shimmer-bar h-9 w-9 rounded-lg" />
+            </div>
+          </div>
+        </div>
+
+        {/* Center loader */}
+        <div className="flex flex-col items-center justify-center mt-40 gap-6">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full border-4 border-blue-100 dark:border-blue-900" />
+            <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-blue-600 animate-spin" />
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Loading MissionHQ</p>
+            <div className="flex gap-1.5">
+              <div className="w-2 h-2 bg-blue-600 rounded-full loading-dot" />
+              <div className="w-2 h-2 bg-blue-600 rounded-full loading-dot" />
+              <div className="w-2 h-2 bg-blue-600 rounded-full loading-dot" />
+            </div>
+          </div>
+        </div>
+
+        {/* Skeleton cards */}
+        <div className="max-w-7xl mx-auto px-6 mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 p-5">
+              <div className="shimmer-bar h-4 w-24 rounded mb-3" />
+              <div className="shimmer-bar h-8 w-16 rounded mb-2" />
+              <div className="shimmer-bar h-3 w-32 rounded" />
+            </div>
+          ))}
         </div>
       </div>
     );
