@@ -1,0 +1,115 @@
+import { Employee, EmployeeAnalytics, WeekCompliance } from "./types";
+import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, eachWeekOfInterval, isSameWeek } from "date-fns";
+
+const OFFICE_STATUSES = ["Office", "Client Location", "Split Day"];
+
+export function calculateWeeklyCompliance(
+  statuses: Record<string, string>,
+  dates: string[],
+  requiredDays: number = 4
+): WeekCompliance[] {
+  if (dates.length === 0) return [];
+
+  const sortedDates = [...dates].sort();
+  const firstDate = parseISO(sortedDates[0]);
+  const lastDate = parseISO(sortedDates[sortedDates.length - 1]);
+
+  const weeks = eachWeekOfInterval(
+    { start: firstDate, end: lastDate },
+    { weekStartsOn: 1 } // Monday
+  );
+
+  return weeks.map((weekStart) => {
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+
+    const weekDates = sortedDates.filter((d) => {
+      const date = parseISO(d);
+      return isSameWeek(date, weekStart, { weekStartsOn: 1 });
+    });
+
+    const officeDays = weekDates.filter(
+      (d) => statuses[d] && OFFICE_STATUSES.includes(statuses[d])
+    ).length;
+
+    const totalWorkDays = weekDates.length;
+
+    return {
+      weekLabel: `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d")}`,
+      weekStart: format(weekStart, "yyyy-MM-dd"),
+      weekEnd: format(weekEnd, "yyyy-MM-dd"),
+      totalWorkDays,
+      officeDays,
+      isCompliant: officeDays >= requiredDays,
+      requiredDays,
+    };
+  });
+}
+
+export function computeEmployeeAnalytics(
+  employee: Employee,
+  dates: string[],
+  requiredDays: number = 4
+): EmployeeAnalytics {
+  let office = 0, home = 0, clientLocation = 0, splitDay = 0, travel = 0, leave = 0, pending = 0;
+
+  dates.forEach((d) => {
+    const status = employee.statuses[d];
+    if (!status) return;
+    switch (status) {
+      case "Office": office++; break;
+      case "Home": home++; break;
+      case "Client Location": clientLocation++; break;
+      case "Split Day": splitDay++; break;
+      case "Travel": travel++; break;
+      case "Leave": leave++; break;
+      case "Pending": pending++; break;
+    }
+  });
+
+  const weeklyCompliance = calculateWeeklyCompliance(employee.statuses, dates, requiredDays);
+  const completeWeeks = weeklyCompliance.filter((w) => w.totalWorkDays >= 4);
+  const compliantWeeks = completeWeeks.filter((w) => w.isCompliant).length;
+  const complianceRate = completeWeeks.length > 0 ? (compliantWeeks / completeWeeks.length) * 100 : 0;
+
+  return {
+    name: employee.name,
+    email: employee.email,
+    team: employee.team,
+    office,
+    home,
+    clientLocation,
+    splitDay,
+    travel,
+    leave,
+    pending,
+    totalDays: office + home + clientLocation + splitDay + travel + leave + pending,
+    complianceRate,
+    weeklyCompliance,
+  };
+}
+
+export function getThisWeekDates(dates: string[]): string[] {
+  const now = new Date();
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+
+  return dates.filter((d) => {
+    const date = parseISO(d);
+    return isWithinInterval(date, { start: weekStart, end: weekEnd });
+  });
+}
+
+export function getThisMonthDates(dates: string[]): string[] {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  return dates.filter((d) => {
+    const date = parseISO(d);
+    return date.getFullYear() === year && date.getMonth() === month;
+  });
+}
+
+export function filterDateRange(dates: string[], from: string, to: string): string[] {
+  return dates.filter((d) => d >= from && d <= to);
+}
