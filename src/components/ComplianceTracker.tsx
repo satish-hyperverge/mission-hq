@@ -5,13 +5,13 @@ import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
 interface Props {
   analytics: EmployeeAnalytics[];
-  selectedTeam: string;
+  selectedDept: string;
 }
 
-export default function ComplianceTracker({ analytics, selectedTeam }: Props) {
-  const filtered = selectedTeam === "All"
+export default function ComplianceTracker({ analytics, selectedDept }: Props) {
+  const filtered = selectedDept === "All"
     ? analytics
-    : analytics.filter((a) => a.team === selectedTeam);
+    : analytics.filter((a) => a.department === selectedDept);
 
   const sorted = [...filtered].sort((a, b) => a.complianceRate - b.complianceRate);
 
@@ -44,7 +44,7 @@ export default function ComplianceTracker({ analytics, selectedTeam }: Props) {
           <thead className="sticky top-0 bg-gray-50 dark:bg-slate-800">
             <tr className="border-b dark:border-slate-700">
               <th className="text-left py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Name</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Team</th>
+              <th className="text-left py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Department</th>
               <th className="text-center py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Office Days</th>
               <th className="text-center py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Compliance</th>
               <th className="text-center py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Status</th>
@@ -54,7 +54,7 @@ export default function ComplianceTracker({ analytics, selectedTeam }: Props) {
             {sorted.map((emp) => (
               <tr key={emp.email} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/50">
                 <td className="py-2 px-3 font-medium text-gray-900 dark:text-gray-100">{emp.name}</td>
-                <td className="py-2 px-3 text-gray-500 dark:text-gray-400">{emp.team}</td>
+                <td className="py-2 px-3 text-gray-500 dark:text-gray-400">{emp.department}</td>
                 <td className="py-2 px-3 text-center text-gray-900 dark:text-gray-100">{emp.office + emp.clientLocation + emp.splitDay}</td>
                 <td className="py-2 px-3 text-center">
                   <div className="flex items-center justify-center gap-2">

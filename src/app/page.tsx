@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
-import { generateDummyData, getTeams } from "@/lib/dummy-data";
+import { useState, useMemo, useEffect } from "react";
+import { fetchAllData } from "@/lib/api";
 import { computeEmployeeAnalytics } from "@/lib/utils";
 import { Employee } from "@/lib/types";
 import { useTheme } from "@/lib/theme";
@@ -11,42 +11,54 @@ import ComplianceTracker from "@/components/ComplianceTracker";
 import TeamBreakdown from "@/components/TeamBreakdown";
 import EmployeeDetail from "@/components/EmployeeDetail";
 import { DailyTrendChart, StatusPieChart, TeamComplianceChart, WeeklyOfficeTrend } from "@/components/Charts";
-import { MapPin, BarChart3, Users, ShieldCheck, Download, Sun, Moon, TrendingUp, Loader2 } from "lucide-react";
+import { MapPin, BarChart3, Users, ShieldCheck, Download, Sun, Moon, TrendingUp, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 
 type Tab = "overview" | "compliance" | "team" | "trends";
 
 export default function Dashboard() {
-  // Generate data only on client to avoid hydration mismatch (Math.random differs server vs client)
-  const dataRef = useRef<{ employees: Employee[]; dates: string[] } | null>(null);
-  const [ready, setReady] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [dates, setDates] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    dataRef.current = generateDummyData();
-    setReady(true);
-  }, []);
-
-  const employees = dataRef.current?.employees ?? [];
-  const dates = dataRef.current?.dates ?? [];
-  const teams = getTeams();
   const { theme, toggleTheme } = useTheme();
 
-  const [selectedTeam, setSelectedTeam] = useState("All");
+  const [selectedDept, setSelectedDept] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
-  // Set initial date once data is ready
-  useEffect(() => {
-    if (ready && dates.length > 0 && !selectedDate) {
-      setSelectedDate(dates[dates.length - 1]);
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchAllData();
+      setEmployees(data.employees);
+      setDates(data.dates);
+      if (data.dates.length > 0) {
+        setSelectedDate(data.dates[data.dates.length - 1]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load data");
+    } finally {
+      setLoading(false);
     }
-  }, [ready, dates, selectedDate]);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const departments = useMemo(() => {
+    const depts = Array.from(new Set(employees.map((e) => e.department).filter(Boolean)));
+    return depts.sort();
+  }, [employees]);
 
   const filteredEmployees = useMemo(() => {
     let result = employees;
-    if (selectedTeam !== "All") {
-      result = result.filter((e) => e.team === selectedTeam);
+    if (selectedDept !== "All") {
+      result = result.filter((e) => e.department === selectedDept);
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -55,7 +67,7 @@ export default function Dashboard() {
       );
     }
     return result;
-  }, [employees, selectedTeam, searchQuery]);
+  }, [employees, selectedDept, searchQuery]);
 
   const analytics = useMemo(
     () => filteredEmployees.map((e) => computeEmployeeAnalytics(e, dates)),
@@ -63,9 +75,9 @@ export default function Dashboard() {
   );
 
   const handleExport = () => {
-    const headers = ["Name", "Email", "Team", "Office", "Home", "Client Location", "Split Day", "Travel", "Leave", "Pending", "Compliance %"];
+    const headers = ["Name", "Email", "Department", "Office", "Home", "Client Location", "Split Day", "Travel", "Leave", "Pending", "Compliance %"];
     const rows = analytics.map((a) => [
-      a.name, a.email, a.team, a.office, a.home, a.clientLocation, a.splitDay, a.travel, a.leave, a.pending, Math.round(a.complianceRate),
+      a.name, a.email, a.department, a.office, a.home, a.clientLocation, a.splitDay, a.travel, a.leave, a.pending, Math.round(a.complianceRate),
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -80,11 +92,10 @@ export default function Dashboard() {
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "overview", label: "Overview", icon: <BarChart3 size={16} /> },
     { id: "compliance", label: "Compliance", icon: <ShieldCheck size={16} /> },
-    { id: "team", label: "Team View", icon: <Users size={16} /> },
+    { id: "team", label: "Department View", icon: <Users size={16} /> },
     { id: "trends", label: "Trends", icon: <TrendingUp size={16} /> },
   ];
 
-  // Quick summary for the header
   const todayCounts = useMemo(() => {
     let office = 0, pending = 0;
     filteredEmployees.forEach((e) => {
@@ -95,12 +106,27 @@ export default function Dashboard() {
     return { office, pending, total: filteredEmployees.length };
   }, [filteredEmployees, selectedDate]);
 
-  if (!ready || !selectedDate) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 size={32} className="animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading dashboard...</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Loading data from MissionHQ...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center max-w-md">
+          <AlertCircle size={40} className="text-red-500" />
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Failed to load data</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{error}</p>
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            <RefreshCw size={16} /> Retry
+          </button>
         </div>
       </div>
     );
@@ -125,6 +151,13 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={loadData}
+              className="p-2.5 rounded-xl bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-all text-gray-600 dark:text-gray-300 active:scale-95"
+              title="Refresh data"
+            >
+              <RefreshCw size={16} />
+            </button>
             <button
               onClick={toggleTheme}
               className="p-2.5 rounded-xl bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-all text-gray-600 dark:text-gray-300 active:scale-95"
@@ -166,9 +199,9 @@ export default function Dashboard() {
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5">
         <div className="animate-fade-in mb-5">
           <Filters
-            teams={teams}
-            selectedTeam={selectedTeam}
-            onTeamChange={setSelectedTeam}
+            departments={departments}
+            selectedDept={selectedDept}
+            onDeptChange={setSelectedDept}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             selectedDate={selectedDate}
@@ -177,12 +210,11 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* No results message */}
         {filteredEmployees.length === 0 ? (
           <div className="animate-fade-in flex flex-col items-center justify-center py-20 text-center">
             <Users size={48} className="text-gray-300 dark:text-slate-600 mb-4" />
             <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-400">No employees found</h3>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your search or team filter</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your search or department filter</p>
           </div>
         ) : (
           <div key={activeTab} className="animate-fade-in space-y-5">
@@ -201,7 +233,7 @@ export default function Dashboard() {
 
             {activeTab === "compliance" && (
               <>
-                <ComplianceTracker analytics={analytics} selectedTeam={selectedTeam} />
+                <ComplianceTracker analytics={analytics} selectedDept={selectedDept} />
                 <WeeklyOfficeTrend employees={filteredEmployees} dates={dates} />
               </>
             )}
@@ -211,7 +243,7 @@ export default function Dashboard() {
                 <TeamBreakdown
                   employees={filteredEmployees}
                   dates={dates}
-                  selectedTeam={selectedTeam}
+                  selectedDept={selectedDept}
                   selectedDate={selectedDate}
                 />
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 p-5">
@@ -232,7 +264,7 @@ export default function Dashboard() {
                           <div className="flex items-start justify-between mb-1.5">
                             <div>
                               <div className="font-medium text-sm text-gray-800 dark:text-gray-100">{emp.name}</div>
-                              <div className="text-[11px] text-gray-400 dark:text-gray-500">{emp.team}</div>
+                              <div className="text-[11px] text-gray-400 dark:text-gray-500">{emp.department}</div>
                             </div>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${
                               todayStatus === "Office" ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" :
@@ -284,7 +316,6 @@ export default function Dashboard() {
         )}
       </main>
 
-      {/* Employee Detail Modal */}
       {selectedEmployee && (
         <EmployeeDetail
           employee={selectedEmployee}

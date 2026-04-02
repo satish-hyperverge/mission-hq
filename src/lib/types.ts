@@ -3,7 +3,7 @@ export type LocationStatus = "Office" | "Home" | "Client Location" | "Split Day"
 export interface Employee {
   name: string;
   email: string;
-  team: string;
+  department: string;
   statuses: Record<string, LocationStatus | string>;
 }
 
@@ -11,6 +11,8 @@ export interface ApiResponse {
   success: boolean;
   dates: string[];
   employees: Employee[];
+  totalEmployees: number;
+  totalDates: number;
   fetchedAt: string;
 }
 
@@ -27,7 +29,7 @@ export interface WeekCompliance {
 export interface EmployeeAnalytics {
   name: string;
   email: string;
-  team: string;
+  department: string;
   office: number;
   home: number;
   clientLocation: number;

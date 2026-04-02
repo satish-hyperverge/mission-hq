@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MissionHQ Dashboard
+
+Location tracking dashboard for monitoring team work locations and office compliance.
+
+## What it does
+
+- Tracks daily work location of employees (Office, Home, Client Location, Split Day, Travel, Leave)
+- Monitors **4-day office compliance** requirement per week
+- Provides team-wise and individual breakdowns
+- Dark/light theme support
+
+## Features
+
+### Overview Tab
+- Today's stats cards with response rate indicator
+- Daily attendance stacked bar chart (last 20 days)
+- Status distribution pie chart
+- Team-wise office percentage comparison
+
+### Compliance Tab
+- 4-day office compliance tracker per employee
+- Compliant / At Risk / Non-Compliant categorization
+- Weekly office attendance trend line chart
+
+### Team View Tab
+- Last 5 days status table per employee
+- Employee detail cards with compliance progress bars
+- Click any employee for detailed modal with:
+  - 30-day activity heatmap
+  - Weekly compliance breakdown
+  - Status count summary
+
+### Trends Tab
+- Daily attendance stacked chart
+- Weekly office % trend
+- Team comparison chart
+
+### Other
+- Search by name or email
+- Filter by team and date
+- CSV export
+- Responsive design
+
+## Tech Stack
+
+- **Next.js 14** with App Router
+- **TypeScript**
+- **Tailwind CSS**
+- **Recharts** for charts
+- **date-fns** for date utilities
+- **Lucide React** for icons
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Data Source
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Currently uses dummy data for demo. To connect to real data:
 
-## Learn More
+1. Deploy the `doGet` endpoint in Google Apps Script (`App Script/WebApp.js`)
+2. Replace the dummy data import in `src/app/page.tsx` with a fetch call to your deployed web app URL
 
-To learn more about Next.js, take a look at the following resources:
+### Google Apps Script Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Add these as **Script Properties** (Project Settings > Script Properties):
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Key | Value |
+|-----|-------|
+| `SLACK_BOT_TOKEN` | Your Slack bot token (`xoxb-...`) |
+| `SLACK_USER_TOKEN` | Your Slack user token (`xoxp-...`) |
+| `SLACK_CHANNEL_ID` | Your Slack channel ID |
 
-## Deploy on Vercel
+### API Endpoints (doGet)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Parameter | Description |
+|-----------|-------------|
+| `?action=all` | All employee data with date-wise statuses |
+| `?action=analytics` | Aggregated analytics |
+| `?action=today` | Today's status for everyone |
+| `?action=daterange&from=YYYY-MM-DD&to=YYYY-MM-DD` | Date range query |
+| `?action=teams` | Team-grouped data |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+```bash
+npm run build
+```
+
+Deploy to Vercel, Netlify, or any Node.js hosting.

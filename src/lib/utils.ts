@@ -74,7 +74,7 @@ export function computeEmployeeAnalytics(
   return {
     name: employee.name,
     email: employee.email,
-    team: employee.team,
+    department: employee.department,
     office,
     home,
     clientLocation,

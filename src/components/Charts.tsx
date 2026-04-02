@@ -113,34 +113,34 @@ interface TeamComplianceProps {
 export function TeamComplianceChart({ employees, dates }: TeamComplianceProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const teams: Record<string, { total: number; officeDays: number }> = {};
+  const departments: Record<string, { total: number; officeDays: number }> = {};
 
   employees.forEach((emp) => {
-    if (!teams[emp.team]) teams[emp.team] = { total: 0, officeDays: 0 };
+    if (!departments[emp.department]) departments[emp.department] = { total: 0, officeDays: 0 };
 
     const lastWeekDates = dates.slice(-5);
     lastWeekDates.forEach((d) => {
       const status = emp.statuses[d];
-      teams[emp.team].total++;
+      departments[emp.department].total++;
       if (status === "Office" || status === "Client Location" || status === "Split Day") {
-        teams[emp.team].officeDays++;
+        departments[emp.department].officeDays++;
       }
     });
   });
 
-  const data = Object.entries(teams).map(([team, val]) => ({
-    team,
+  const data = Object.entries(departments).map(([department, val]) => ({
+    department,
     "Office %": Math.round((val.officeDays / val.total) * 100),
     "Target": 80,
   }));
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 p-5">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Team-wise Office % (This Week)</h2>
+      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Department-wise Office % (This Week)</h2>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data} barSize={40}>
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#334155" : "#f0f0f0"} />
-          <XAxis dataKey="team" tick={{ fontSize: 12, fill: isDark ? "#94a3b8" : "#6b7280" }} />
+          <XAxis dataKey="department" tick={{ fontSize: 12, fill: isDark ? "#94a3b8" : "#6b7280" }} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: isDark ? "#94a3b8" : "#6b7280" }} />
           <Tooltip contentStyle={isDark ? darkTooltipStyle : lightTooltipStyle} />
           <Legend wrapperStyle={{ fontSize: 12 }} />

@@ -31,7 +31,7 @@ export default function EmployeeDetail({ employee, dates, onClose }: Props) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">{employee.name}</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{employee.email} &middot; {employee.team}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{employee.email} &middot; {employee.department}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-600 dark:text-gray-300">
             <X size={20} />

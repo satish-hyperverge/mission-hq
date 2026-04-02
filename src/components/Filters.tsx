@@ -3,9 +3,9 @@
 import { Search, Filter } from "lucide-react";
 
 interface Props {
-  teams: string[];
-  selectedTeam: string;
-  onTeamChange: (team: string) => void;
+  departments: string[];
+  selectedDept: string;
+  onDeptChange: (dept: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   selectedDate: string;
@@ -14,9 +14,9 @@ interface Props {
 }
 
 export default function Filters({
-  teams,
-  selectedTeam,
-  onTeamChange,
+  departments,
+  selectedDept,
+  onDeptChange,
   searchQuery,
   onSearchChange,
   selectedDate,
@@ -42,13 +42,13 @@ export default function Filters({
       </div>
 
       <select
-        value={selectedTeam}
-        onChange={(e) => onTeamChange(e.target.value)}
+        value={selectedDept}
+        onChange={(e) => onDeptChange(e.target.value)}
         className="px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100"
       >
-        <option value="All">All Teams</option>
-        {teams.map((team) => (
-          <option key={team} value={team}>{team}</option>
+        <option value="All">All Departments</option>
+        {departments.map((dept) => (
+          <option key={dept} value={dept}>{dept}</option>
         ))}
       </select>
 
