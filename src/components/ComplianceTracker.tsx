@@ -1,85 +1,200 @@
 "use client";
 
 import { EmployeeAnalytics } from "@/lib/types";
-import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, Shield, X } from "lucide-react";
+import { useState } from "react";
 
 interface Props {
   analytics: EmployeeAnalytics[];
   selectedDept: string;
 }
 
+type SortField = "name" | "department" | "officeDays" | "compliance";
+type SortDir = "asc" | "desc";
+type ViewFilter = "all" | "compliant" | "atRisk" | "nonCompliant";
+
 export default function ComplianceTracker({ analytics, selectedDept }: Props) {
+  const [sortField, setSortField] = useState<SortField>("compliance");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
+
   const filtered = selectedDept === "All"
     ? analytics
     : analytics.filter((a) => a.department === selectedDept);
 
-  const sorted = [...filtered].sort((a, b) => a.complianceRate - b.complianceRate);
+  const compliant = filtered.filter((a) => a.complianceRate >= 80);
+  const atRisk = filtered.filter((a) => a.complianceRate >= 50 && a.complianceRate < 80);
+  const nonCompliant = filtered.filter((a) => a.complianceRate < 50);
 
-  const compliant = sorted.filter((a) => a.complianceRate >= 80);
-  const atRisk = sorted.filter((a) => a.complianceRate >= 50 && a.complianceRate < 80);
-  const nonCompliant = sorted.filter((a) => a.complianceRate < 50);
+  const complianceRate = filtered.length > 0
+    ? Math.round((compliant.length / filtered.length) * 100)
+    : 0;
+
+  const displayList = viewFilter === "all" ? filtered
+    : viewFilter === "compliant" ? compliant
+    : viewFilter === "atRisk" ? atRisk
+    : nonCompliant;
+
+  const sorted = [...displayList].sort((a, b) => {
+    let cmp = 0;
+    switch (sortField) {
+      case "name": cmp = a.name.localeCompare(b.name); break;
+      case "department": cmp = a.department.localeCompare(b.department); break;
+      case "officeDays": cmp = (a.office + a.clientLocation + a.splitDay) - (b.office + b.clientLocation + b.splitDay); break;
+      case "compliance": cmp = a.complianceRate - b.complianceRate; break;
+    }
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => (
+    <span className={`ml-1 text-[10px] ${sortField === field ? "opacity-100" : "opacity-30"}`} style={{ color: sortField === field ? "var(--accent)" : "var(--text-muted)" }}>
+      {sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+    </span>
+  );
+
+  const summaryItems: { label: string; count: number; icon: React.ReactNode; color: string; filter: ViewFilter }[] = [
+    { label: "Compliant", count: compliant.length, icon: <CheckCircle2 size={14} />, color: "text-emerald-500", filter: "compliant" },
+    { label: "At Risk", count: atRisk.length, icon: <AlertTriangle size={14} />, color: "text-amber-500", filter: "atRisk" },
+    { label: "Non-Compliant", count: nonCompliant.length, icon: <XCircle size={14} />, color: "text-red-500", filter: "nonCompliant" },
+  ];
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 p-5">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">4-Day Office Compliance</h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Weekly compliance to 4 days in-office requirement (Office + Client + Split Day)</p>
-
-      <div className="grid grid-cols-3 gap-4 mb-5">
-        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center border border-green-200 dark:border-green-800">
-          <div className="text-2xl font-bold text-green-700 dark:text-green-400">{compliant.length}</div>
-          <div className="text-xs text-green-600 dark:text-green-500 font-medium">Compliant (&ge;80%)</div>
+    <div className="card p-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
+            <Shield size={18} />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>4-Day Office Compliance</h2>
+            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Office + Client + Split Day count toward requirement</p>
+          </div>
         </div>
-        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center border border-amber-200 dark:border-amber-800">
-          <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">{atRisk.length}</div>
-          <div className="text-xs text-amber-600 dark:text-amber-500 font-medium">At Risk (50-80%)</div>
-        </div>
-        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center border border-red-200 dark:border-red-800">
-          <div className="text-2xl font-bold text-red-700 dark:text-red-400">{nonCompliant.length}</div>
-          <div className="text-xs text-red-600 dark:text-red-500 font-medium">Non-Compliant (&lt;50%)</div>
+        <div className="flex items-center gap-2">
+          <div className="text-right mr-2">
+            <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>Team Rate</div>
+            <div className={`text-lg font-bold font-mono ${complianceRate >= 80 ? "text-emerald-600 dark:text-emerald-400" : complianceRate >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
+              {complianceRate}%
+            </div>
+          </div>
+          <div className="w-11 h-11 relative">
+            <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" className="text-gray-100 dark:text-slate-800" strokeWidth="2.5" />
+              <circle cx="18" cy="18" r="15" fill="none"
+                stroke={complianceRate >= 80 ? "#22c55e" : complianceRate >= 50 ? "#f59e0b" : "#ef4444"}
+                strokeWidth="2.5" strokeDasharray={`${complianceRate * 0.94} 100`}
+                strokeLinecap="round" className="transition-all duration-300" />
+            </svg>
+          </div>
         </div>
       </div>
 
-      <div className="max-h-[400px] overflow-y-auto">
+      {/* Summary Row */}
+      <div className="flex items-center gap-1 mb-5 flex-wrap">
+        {summaryItems.map((item) => (
+          <button
+            key={item.label}
+            onClick={() => setViewFilter(viewFilter === item.filter ? "all" : item.filter)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+            style={{
+              background: viewFilter === item.filter ? "var(--accent-light)" : "var(--bg-inset)",
+              color: viewFilter === item.filter ? "var(--accent)" : "var(--text-secondary)",
+              border: viewFilter === item.filter ? "1px solid var(--accent-muted)" : "1px solid transparent",
+            }}
+          >
+            <span className={item.color}>{item.icon}</span>
+            <span className="font-bold font-mono">{item.count}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+        {viewFilter !== "all" && (
+          <button onClick={() => setViewFilter("all")} className="ml-1 text-[11px] font-medium px-2 py-1 rounded-md transition-all"
+            style={{ color: "var(--text-muted)" }}>
+            <X size={12} className="inline mr-0.5" />Clear
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="max-h-[400px] overflow-y-auto scrollbar-thin rounded-lg border" style={{ borderColor: "var(--border-subtle)" }}>
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-gray-50 dark:bg-slate-800">
-            <tr className="border-b dark:border-slate-700">
-              <th className="text-left py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Name</th>
-              <th className="text-left py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Department</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Office Days</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Compliance</th>
-              <th className="text-center py-2 px-3 font-medium text-gray-600 dark:text-gray-300">Status</th>
+          <thead className="sticky top-0 z-10" style={{ background: "var(--bg-surface-secondary)" }}>
+            <tr>
+              <th onClick={() => toggleSort("name")} className="text-left py-2.5 px-3 font-medium cursor-pointer select-none" style={{ color: "var(--text-secondary)" }}>
+                Employee <SortIcon field="name" />
+              </th>
+              <th onClick={() => toggleSort("department")} className="text-left py-2.5 px-3 font-medium cursor-pointer select-none hidden sm:table-cell" style={{ color: "var(--text-secondary)" }}>
+                Department <SortIcon field="department" />
+              </th>
+              <th onClick={() => toggleSort("officeDays")} className="text-center py-2.5 px-3 font-medium cursor-pointer select-none" style={{ color: "var(--text-secondary)" }}>
+                Office <SortIcon field="officeDays" />
+              </th>
+              <th onClick={() => toggleSort("compliance")} className="text-center py-2.5 px-3 font-medium cursor-pointer select-none" style={{ color: "var(--text-secondary)" }}>
+                Compliance <SortIcon field="compliance" />
+              </th>
+              <th className="text-center py-2.5 px-3 w-10"></th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((emp) => (
-              <tr key={emp.email} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                <td className="py-2 px-3 font-medium text-gray-900 dark:text-gray-100">{emp.name}</td>
-                <td className="py-2 px-3 text-gray-500 dark:text-gray-400">{emp.department}</td>
-                <td className="py-2 px-3 text-center text-gray-900 dark:text-gray-100">{emp.office + emp.clientLocation + emp.splitDay}</td>
-                <td className="py-2 px-3 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="w-20 bg-gray-200 dark:bg-slate-700 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${emp.complianceRate >= 80 ? "bg-green-500" : emp.complianceRate >= 50 ? "bg-amber-500" : "bg-red-500"}`}
-                        style={{ width: `${Math.min(emp.complianceRate, 100)}%` }}
-                      />
+            {sorted.map((emp) => {
+              const officeDays = emp.office + emp.clientLocation + emp.splitDay;
+              return (
+                <tr key={emp.email} className="table-row-hover" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                  <td className="py-2.5 px-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`avatar w-7 h-7 text-[10px] ${
+                        emp.complianceRate >= 80 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                        : emp.complianceRate >= 50 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                      }`}>
+                        {emp.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                      </div>
+                      <div>
+                        <div className="font-medium text-[13px]" style={{ color: "var(--text-primary)" }}>{emp.name}</div>
+                        <div className="text-[11px] sm:hidden" style={{ color: "var(--text-muted)" }}>{emp.department}</div>
+                      </div>
                     </div>
-                    <span className="text-xs text-gray-600 dark:text-gray-400 w-10">{Math.round(emp.complianceRate)}%</span>
-                  </div>
-                </td>
-                <td className="py-2 px-3 text-center">
-                  {emp.complianceRate >= 80 ? (
-                    <CheckCircle2 size={16} className="text-green-500 inline" />
-                  ) : emp.complianceRate >= 50 ? (
-                    <AlertTriangle size={16} className="text-amber-500 inline" />
-                  ) : (
-                    <XCircle size={16} className="text-red-500 inline" />
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="py-2.5 px-3 hidden sm:table-cell text-[13px]" style={{ color: "var(--text-muted)" }}>{emp.department}</td>
+                  <td className="py-2.5 px-3 text-center font-semibold font-mono text-[13px]" style={{ color: "var(--text-primary)" }}>{officeDays}</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-16 rounded-full h-1.5" style={{ background: "var(--bg-inset)" }}>
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-300 ${emp.complianceRate >= 80 ? "bg-emerald-500" : emp.complianceRate >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+                          style={{ width: `${Math.min(emp.complianceRate, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-semibold font-mono w-10 ${
+                        emp.complianceRate >= 80 ? "text-emerald-600 dark:text-emerald-400" : emp.complianceRate >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
+                      }`}>{Math.round(emp.complianceRate)}%</span>
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    {emp.complianceRate >= 80 ? (
+                      <CheckCircle2 size={14} className="text-emerald-500 inline" />
+                    ) : emp.complianceRate >= 50 ? (
+                      <AlertTriangle size={14} className="text-amber-500 inline" />
+                    ) : (
+                      <XCircle size={14} className="text-red-500 inline" />
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+        {sorted.length === 0 && (
+          <div className="py-12 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+            No employees match this filter
+          </div>
+        )}
       </div>
     </div>
   );

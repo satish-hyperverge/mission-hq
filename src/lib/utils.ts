@@ -71,6 +71,39 @@ export function computeEmployeeAnalytics(
   const compliantWeeks = completeWeeks.filter((w) => w.isCompliant).length;
   const complianceRate = completeWeeks.length > 0 ? (compliantWeeks / completeWeeks.length) * 100 : 0;
 
+  // Streak calculation
+  const sortedDates = [...dates].sort();
+
+  // Office streaks
+  let currentStreak = 0;
+  let longestStreak = 0;
+  let streak = 0;
+  for (const d of sortedDates) {
+    const s = employee.statuses[d];
+    if (s && OFFICE_STATUSES.includes(s)) { streak++; if (streak > longestStreak) longestStreak = streak; }
+    else { streak = 0; }
+  }
+  for (let i = sortedDates.length - 1; i >= 0; i--) {
+    const s = employee.statuses[sortedDates[i]];
+    if (s && OFFICE_STATUSES.includes(s)) currentStreak++;
+    else break;
+  }
+
+  // Attendance streaks (any status except Pending or missing)
+  let currentAttendanceStreak = 0;
+  let longestAttendanceStreak = 0;
+  let aStreak = 0;
+  for (const d of sortedDates) {
+    const s = employee.statuses[d];
+    if (s && s !== "Pending") { aStreak++; if (aStreak > longestAttendanceStreak) longestAttendanceStreak = aStreak; }
+    else { aStreak = 0; }
+  }
+  for (let i = sortedDates.length - 1; i >= 0; i--) {
+    const s = employee.statuses[sortedDates[i]];
+    if (s && s !== "Pending") currentAttendanceStreak++;
+    else break;
+  }
+
   return {
     name: employee.name,
     email: employee.email,
@@ -85,6 +118,10 @@ export function computeEmployeeAnalytics(
     totalDays: office + home + clientLocation + splitDay + travel + leave + pending,
     complianceRate,
     weeklyCompliance,
+    currentStreak,
+    longestStreak,
+    currentAttendanceStreak,
+    longestAttendanceStreak,
   };
 }
 

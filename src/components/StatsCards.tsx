@@ -1,38 +1,45 @@
 "use client";
 
 import { Employee } from "@/lib/types";
-import { Building2, Home, MapPin, ArrowLeftRight, Plane, TreePalm, AlertCircle, Users } from "lucide-react";
+import { Building2, Home, MapPin, ArrowLeftRight, Plane, TreePalm, AlertCircle, Users, TrendingUp, TrendingDown } from "lucide-react";
 
 interface Props {
   employees: Employee[];
   date: string;
+  previousDate?: string;
 }
 
-export default function StatsCards({ employees, date }: Props) {
+export default function StatsCards({ employees, date, previousDate }: Props) {
   const counts = { Office: 0, Home: 0, "Client Location": 0, "Split Day": 0, Travel: 0, Leave: 0, Pending: 0, "No Data": 0 };
+  const prevCounts = { Office: 0, Home: 0, "Client Location": 0, "Split Day": 0, Travel: 0, Leave: 0, Pending: 0, "No Data": 0 };
 
   employees.forEach((emp) => {
     const status = emp.statuses[date] || "No Data";
-    if (status in counts) {
-      counts[status as keyof typeof counts]++;
-    } else {
-      counts["No Data"]++;
+    if (status in counts) counts[status as keyof typeof counts]++;
+    else counts["No Data"]++;
+
+    if (previousDate) {
+      const prevStatus = emp.statuses[previousDate] || "No Data";
+      if (prevStatus in prevCounts) prevCounts[prevStatus as keyof typeof prevCounts]++;
+      else prevCounts["No Data"]++;
     }
   });
 
   const total = employees.length;
   const responded = total - counts.Pending - counts["No Data"];
   const responseRate = total > 0 ? Math.round((responded / total) * 100) : 0;
+  const inOffice = counts.Office + counts["Client Location"] + counts["Split Day"];
+  const officeRate = total > 0 ? Math.round((inOffice / total) * 100) : 0;
 
   const cards = [
-    { label: "Total Team", value: total, icon: <Users size={18} />, color: "bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300" },
-    { label: "Office", value: counts.Office, icon: <Building2 size={18} />, color: "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400" },
-    { label: "Home", value: counts.Home, icon: <Home size={18} />, color: "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400" },
-    { label: "Client", value: counts["Client Location"], icon: <MapPin size={18} />, color: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400" },
-    { label: "Split Day", value: counts["Split Day"], icon: <ArrowLeftRight size={18} />, color: "bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-900/30 dark:border-violet-800 dark:text-violet-400" },
-    { label: "Travel", value: counts.Travel, icon: <Plane size={18} />, color: "bg-pink-50 border-pink-200 text-pink-700 dark:bg-pink-900/30 dark:border-pink-800 dark:text-pink-400" },
-    { label: "Leave", value: counts.Leave, icon: <TreePalm size={18} />, color: "bg-gray-50 border-gray-200 text-gray-600 dark:bg-slate-800 dark:border-slate-600 dark:text-gray-400" },
-    { label: "Pending", value: counts.Pending, icon: <AlertCircle size={18} />, color: "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400" },
+    { label: "Total", value: total, icon: <Users size={16} />, accent: "stat-card-slate", iconBg: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400" },
+    { label: "Office", value: counts.Office, icon: <Building2 size={16} />, accent: "stat-card-green", iconBg: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400", prevValue: previousDate ? prevCounts.Office : undefined },
+    { label: "Home", value: counts.Home, icon: <Home size={16} />, accent: "stat-card-blue", iconBg: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400", prevValue: previousDate ? prevCounts.Home : undefined },
+    { label: "Client", value: counts["Client Location"], icon: <MapPin size={16} />, accent: "stat-card-amber", iconBg: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400", prevValue: previousDate ? prevCounts["Client Location"] : undefined },
+    { label: "Split", value: counts["Split Day"], icon: <ArrowLeftRight size={16} />, accent: "stat-card-violet", iconBg: "bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400", prevValue: previousDate ? prevCounts["Split Day"] : undefined },
+    { label: "Travel", value: counts.Travel, icon: <Plane size={16} />, accent: "stat-card-pink", iconBg: "bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400", prevValue: previousDate ? prevCounts.Travel : undefined },
+    { label: "Leave", value: counts.Leave, icon: <TreePalm size={16} />, accent: "stat-card-gray", iconBg: "bg-gray-100 dark:bg-slate-800/80 text-gray-500 dark:text-gray-400", prevValue: previousDate ? prevCounts.Leave : undefined },
+    { label: "Pending", value: counts.Pending, icon: <AlertCircle size={16} />, accent: "stat-card-red", iconBg: "bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400", prevValue: previousDate ? prevCounts.Pending : undefined },
   ];
 
   const formattedDate = new Date(date + "T00:00:00").toLocaleDateString("en-IN", {
@@ -41,42 +48,87 @@ export default function StatsCards({ employees, date }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      {/* Hero Row */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Today&apos;s Overview</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{formattedDate}</p>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Today&apos;s Snapshot</h2>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{formattedDate}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="text-xs text-gray-500 dark:text-gray-400">Response Rate</div>
-            <div className={`text-sm font-bold ${responseRate >= 80 ? "text-green-600 dark:text-green-400" : responseRate >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>
-              {responseRate}%
+
+        {/* KPI Rings */}
+        <div className="flex items-center gap-6 card px-5 py-3.5">
+          {/* Office Rate */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 relative flex-shrink-0">
+              <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" className="text-gray-100 dark:text-slate-800" strokeWidth="2.5" />
+                <circle cx="18" cy="18" r="14" fill="none"
+                  stroke={officeRate >= 80 ? "#22c55e" : officeRate >= 60 ? "#f59e0b" : "#ef4444"}
+                  strokeWidth="2.5" strokeDasharray={`${officeRate * 0.88} 100`}
+                  strokeLinecap="round" className="transition-all duration-300" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold font-mono" style={{ color: "var(--text-primary)" }}>
+                {officeRate}%
+              </span>
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Office</div>
+              <div className="text-sm font-bold font-mono" style={{ color: "var(--text-primary)" }}>
+                {inOffice}<span style={{ color: "var(--text-muted)" }} className="font-normal">/{total}</span>
+              </div>
             </div>
           </div>
-          <div className="w-12 h-12 relative">
-            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
-              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none" stroke="currentColor" className="text-gray-200 dark:text-slate-700" strokeWidth="3" />
-              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none"
-                stroke={responseRate >= 80 ? "#22c55e" : responseRate >= 50 ? "#f59e0b" : "#ef4444"}
-                strokeWidth="3"
-                strokeDasharray={`${responseRate}, 100`}
-                strokeLinecap="round" />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-gray-300">
-              {responded}/{total}
-            </span>
+
+          <div className="w-px h-9" style={{ background: "var(--border-default)" }} />
+
+          {/* Response Rate */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 relative flex-shrink-0">
+              <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" className="text-gray-100 dark:text-slate-800" strokeWidth="2.5" />
+                <circle cx="18" cy="18" r="14" fill="none"
+                  stroke={responseRate >= 80 ? "#6366f1" : responseRate >= 50 ? "#f59e0b" : "#ef4444"}
+                  strokeWidth="2.5" strokeDasharray={`${responseRate * 0.88} 100`}
+                  strokeLinecap="round" className="transition-all duration-300" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold font-mono" style={{ color: "var(--text-primary)" }}>
+                {responseRate}%
+              </span>
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Responded</div>
+              <div className="text-sm font-bold font-mono" style={{ color: "var(--text-primary)" }}>
+                {responded}<span style={{ color: "var(--text-muted)" }} className="font-normal">/{total}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-        {cards.map((card) => (
-          <div key={card.label} className={`card-hover rounded-xl border p-3 cursor-default ${card.color}`}>
-            <div className="flex items-center gap-1.5 mb-1 opacity-70">{card.icon}<span className="text-[11px] font-medium">{card.label}</span></div>
-            <div className="text-2xl font-bold">{card.value}</div>
-          </div>
-        ))}
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+        {cards.map((card) => {
+          const diff = card.prevValue !== undefined ? card.value - card.prevValue : undefined;
+          return (
+            <div key={card.label} className={`stat-card ${card.accent} card-hover card p-3.5`}>
+              <div className={`w-7 h-7 rounded-lg ${card.iconBg} flex items-center justify-center mb-2.5`}>
+                {card.icon}
+              </div>
+              <div className="text-xl font-bold font-mono leading-none tracking-tight" style={{ color: "var(--text-primary)" }}>
+                {card.value}
+              </div>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{card.label}</span>
+                {diff !== undefined && diff !== 0 && (
+                  <span className={`flex items-center gap-0.5 text-[10px] font-semibold font-mono ${diff > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                    {diff > 0 ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
+                    {diff > 0 ? "+" : ""}{diff}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

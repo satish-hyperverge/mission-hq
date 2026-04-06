@@ -41,6 +41,10 @@ export interface EmployeeAnalytics {
   totalDays: number;
   complianceRate: number; // percentage of weeks meeting 4-day requirement
   weeklyCompliance: WeekCompliance[];
+  currentStreak: number;          // consecutive recent office days (Office/Client/Split)
+  longestStreak: number;          // longest office streak across all dates
+  currentAttendanceStreak: number; // consecutive days with any reported status
+  longestAttendanceStreak: number; // longest attendance streak
 }
 
 export const STATUS_COLORS: Record<string, string> = {
