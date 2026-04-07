@@ -4,7 +4,14 @@ export interface Employee {
   name: string;
   email: string;
   department: string;
+  departments: string[]; // individual departments parsed from comma-separated department field
   statuses: Record<string, LocationStatus | string>;
+}
+
+/** Parse a comma-separated department string into trimmed individual departments */
+export function parseDepartments(department: string): string[] {
+  if (!department) return [];
+  return department.split(",").map((d) => d.trim()).filter(Boolean);
 }
 
 export interface ApiResponse {
@@ -31,6 +38,7 @@ export interface EmployeeAnalytics {
   name: string;
   email: string;
   department: string;
+  departments: string[];
   office: number;
   home: number;
   clientLocation: number;

@@ -30,6 +30,8 @@ export default function StatsCards({ employees, date, previousDate }: Props) {
   const responseRate = total > 0 ? Math.round((responded / total) * 100) : 0;
   const inOffice = counts.Office + counts["Client Location"] + counts["Split Day"];
   const officeRate = total > 0 ? Math.round((inOffice / total) * 100) : 0;
+  const pendingCount = counts.Pending + counts["No Data"];
+  const pendingRate = total > 0 ? Math.round((pendingCount / total) * 100) : 0;
 
   const cards = [
     { label: "Total", value: total, icon: <Users size={16} />, accent: "stat-card-slate", iconBg: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400" },
@@ -99,6 +101,30 @@ export default function StatsCards({ employees, date, previousDate }: Props) {
               <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Responded</div>
               <div className="text-sm font-bold font-mono" style={{ color: "var(--text-primary)" }}>
                 {responded}<span style={{ color: "var(--text-muted)" }} className="font-normal">/{total}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-px h-9" style={{ background: "var(--border-default)" }} />
+
+          {/* Pending */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 relative flex-shrink-0">
+              <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" className="text-gray-100 dark:text-slate-800" strokeWidth="2.5" />
+                <circle cx="18" cy="18" r="14" fill="none"
+                  stroke={pendingRate <= 20 ? "#22c55e" : pendingRate <= 50 ? "#f59e0b" : "#ef4444"}
+                  strokeWidth="2.5" strokeDasharray={`${pendingRate * 0.88} 100`}
+                  strokeLinecap="round" className="transition-all duration-300" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold font-mono" style={{ color: "var(--text-primary)" }}>
+                {pendingRate}%
+              </span>
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Pending</div>
+              <div className="text-sm font-bold font-mono" style={{ color: "var(--text-primary)" }}>
+                {pendingCount}<span style={{ color: "var(--text-muted)" }} className="font-normal">/{total}</span>
               </div>
             </div>
           </div>

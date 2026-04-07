@@ -50,7 +50,16 @@ export default function EmployeeDetail({ employee, dates, onClose }: Props) {
               <h2 className="text-lg font-bold text-white truncate">{employee.name}</h2>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-sm text-white/70">
                 <span className="flex items-center gap-1 truncate"><Mail size={11} /> {employee.email}</span>
-                <span className="flex items-center gap-1"><Briefcase size={11} /> {employee.department}</span>
+                {employee.departments?.length > 0 ? (
+                  <span className="flex items-center gap-1 flex-wrap">
+                    <Briefcase size={11} />
+                    {employee.departments.map((dept) => (
+                      <span key={dept} className="px-1.5 py-0.5 rounded bg-white/15 text-[11px]">{dept}</span>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1"><Briefcase size={11} /> {employee.department}</span>
+                )}
               </div>
             </div>
           </div>

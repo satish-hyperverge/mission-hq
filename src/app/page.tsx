@@ -11,6 +11,7 @@ import ComplianceTracker from "@/components/ComplianceTracker";
 import TeamBreakdown from "@/components/TeamBreakdown";
 import EmployeeDetail from "@/components/EmployeeDetail";
 import { DailyTrendChart, StatusPieChart, TeamComplianceChart, WeeklyOfficeTrend } from "@/components/Charts";
+import WeeklyOfficeCompliance from "@/components/WeeklyOfficeCompliance";
 import {
   MapPin, BarChart3, Users, ShieldCheck, Download, Sun, Moon, TrendingUp,
   RefreshCw, AlertCircle, Clock, AlertTriangle, Search, X, Command,
@@ -52,9 +53,9 @@ function CommandPalette({
     if (query.trim()) {
       const q = query.toLowerCase();
       const empResults: CmdAction[] = employees
-        .filter((e) => e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q) || e.department.toLowerCase().includes(q))
+        .filter((e) => e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q) || e.departments.some((d) => d.toLowerCase().includes(q)))
         .slice(0, 8)
-        .map((e) => ({ id: `emp-${e.email}`, label: e.name, sub: e.department, icon: <Users size={15} />, action: () => onSelectEmployee(e) }));
+        .map((e) => ({ id: `emp-${e.email}`, label: e.name, sub: e.departments.join(", ") || e.department, icon: <Users size={15} />, action: () => onSelectEmployee(e) }));
       return [...empResults, ...items.filter((a) => a.label.toLowerCase().includes(q))];
     }
     return items;
@@ -104,6 +105,7 @@ function CommandPalette({
 export default function Dashboard() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [dates, setDates] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -135,13 +137,13 @@ export default function Dashboard() {
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { setMounted(true); loadData(); }, [loadData]);
   useEffect(() => {
     const interval = setInterval(() => loadData(true), AUTO_REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, [loadData]);
 
-  const departments = useMemo(() => Array.from(new Set(employees.map((e) => e.department).filter(Boolean))).sort(), [employees]);
+  const departments = useMemo(() => Array.from(new Set(employees.flatMap((e) => e.departments))).filter(Boolean).sort(), [employees]);
 
   // Pre-compute analytics for ALL employees once (expensive, only re-runs when employees/dates change)
   const allAnalytics = useMemo(() => {
@@ -152,7 +154,7 @@ export default function Dashboard() {
 
   const filteredEmployees = useMemo(() => {
     let result = employees;
-    if (selectedDept !== "All") result = result.filter((e) => e.department === selectedDept);
+    if (selectedDept !== "All") result = result.filter((e) => e.departments.includes(selectedDept));
     if (searchQuery) { const q = searchQuery.toLowerCase(); result = result.filter((e) => e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)); }
     return result;
   }, [employees, selectedDept, searchQuery]);
@@ -225,7 +227,8 @@ export default function Dashboard() {
   ];
 
   // ─── Loading Skeleton (matches real UI layout) ─────────
-  if (loading) {
+  // Only show skeleton after client mount to avoid hydration mismatch
+  if (!mounted || loading) {
     const S = ({ className }: { className: string }) => <div className={`shimmer-bar ${className}`} />;
     return (
       <div className="min-h-screen" style={{ background: "var(--bg-app)" }}>
@@ -493,6 +496,11 @@ export default function Dashboard() {
               <>
                 <StatsCards employees={filteredEmployees} date={selectedDate} previousDate={previousDate} />
 
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                  <div className="lg:col-span-2"><DailyTrendChart employees={filteredEmployees} dates={dates} /></div>
+                  <StatusPieChart employees={filteredEmployees} date={selectedDate} />
+                </div>
+
                 {/* Top 5 Streaks with tabs */}
                 {(topOfficeStreaks.length > 0 || topAttendanceStreaks.length > 0) && (
                   <div className="card p-5">
@@ -547,7 +555,7 @@ export default function Dashboard() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{emp.name}</div>
-                                <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{emp.department}</div>
+                                <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{emp.departments?.join(", ") || emp.department}</div>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <Flame size={13} className={getStreak(emp) >= 5 ? "text-orange-500" : "text-gray-400 dark:text-gray-600"} />
@@ -562,17 +570,15 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                  <div className="lg:col-span-2"><DailyTrendChart employees={filteredEmployees} dates={dates} /></div>
-                  <StatusPieChart employees={filteredEmployees} date={selectedDate} />
-                </div>
+                <WeeklyOfficeCompliance employees={filteredEmployees} dates={dates} />
                 <TeamComplianceChart employees={filteredEmployees} dates={dates} />
               </>
             )}
 
             {activeTab === "compliance" && (
               <>
-                <ComplianceTracker analytics={analytics} selectedDept={selectedDept} />
+                <WeeklyOfficeCompliance employees={filteredEmployees} dates={dates} />
+                <ComplianceTracker analytics={analytics} selectedDept={selectedDept} dates={dates} />
                 <WeeklyOfficeTrend employees={filteredEmployees} dates={dates} />
               </>
             )}

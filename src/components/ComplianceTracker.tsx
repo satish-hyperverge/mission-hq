@@ -1,26 +1,27 @@
 "use client";
 
 import { EmployeeAnalytics } from "@/lib/types";
-import { CheckCircle2, XCircle, AlertTriangle, Shield, X } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle, Shield, X, Calendar } from "lucide-react";
 import { useState } from "react";
 
 interface Props {
   analytics: EmployeeAnalytics[];
   selectedDept: string;
+  dates: string[];
 }
 
-type SortField = "name" | "department" | "officeDays" | "compliance";
+type SortField = "name" | "department" | "officeDays" | "compliance" | "compliantWeeks";
 type SortDir = "asc" | "desc";
 type ViewFilter = "all" | "compliant" | "atRisk" | "nonCompliant";
 
-export default function ComplianceTracker({ analytics, selectedDept }: Props) {
+export default function ComplianceTracker({ analytics, selectedDept, dates }: Props) {
   const [sortField, setSortField] = useState<SortField>("compliance");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
 
   const filtered = selectedDept === "All"
     ? analytics
-    : analytics.filter((a) => a.department === selectedDept);
+    : analytics.filter((a) => a.departments?.includes(selectedDept));
 
   const compliant = filtered.filter((a) => a.complianceRate >= 80);
   const atRisk = filtered.filter((a) => a.complianceRate >= 50 && a.complianceRate < 80);
@@ -42,6 +43,14 @@ export default function ComplianceTracker({ analytics, selectedDept }: Props) {
       case "department": cmp = a.department.localeCompare(b.department); break;
       case "officeDays": cmp = (a.office + a.clientLocation + a.splitDay) - (b.office + b.clientLocation + b.splitDay); break;
       case "compliance": cmp = a.complianceRate - b.complianceRate; break;
+      case "compliantWeeks": {
+        const aWeeks = a.weeklyCompliance.filter(w => w.totalWorkDays >= 4);
+        const bWeeks = b.weeklyCompliance.filter(w => w.totalWorkDays >= 4);
+        const aCompliant = aWeeks.filter(w => w.isCompliant).length;
+        const bCompliant = bWeeks.filter(w => w.isCompliant).length;
+        cmp = aCompliant - bCompliant;
+        break;
+      }
     }
     return sortDir === "asc" ? cmp : -cmp;
   });
@@ -57,23 +66,41 @@ export default function ComplianceTracker({ analytics, selectedDept }: Props) {
     </span>
   );
 
+  // Date range info
+  const sortedDates = [...dates].sort();
+  const firstDate = sortedDates.length > 0 ? sortedDates[0] : "";
+  const lastDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : "";
+  const totalWorkingDays = dates.length;
+
+  const formatDate = (d: string) => {
+    if (!d) return "";
+    return new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  };
+
+  // Calculate total weeks tracked
+  const sampleAnalytics = filtered.length > 0 ? filtered[0] : null;
+  const totalWeeksTracked = sampleAnalytics ? sampleAnalytics.weeklyCompliance.length : 0;
+  const completeWeeks = sampleAnalytics ? sampleAnalytics.weeklyCompliance.filter(w => w.totalWorkDays >= 4).length : 0;
+
   const summaryItems: { label: string; count: number; icon: React.ReactNode; color: string; filter: ViewFilter }[] = [
-    { label: "Compliant", count: compliant.length, icon: <CheckCircle2 size={14} />, color: "text-emerald-500", filter: "compliant" },
-    { label: "At Risk", count: atRisk.length, icon: <AlertTriangle size={14} />, color: "text-amber-500", filter: "atRisk" },
-    { label: "Non-Compliant", count: nonCompliant.length, icon: <XCircle size={14} />, color: "text-red-500", filter: "nonCompliant" },
+    { label: "Compliant (≥80%)", count: compliant.length, icon: <CheckCircle2 size={14} />, color: "text-emerald-500", filter: "compliant" },
+    { label: "At Risk (50-79%)", count: atRisk.length, icon: <AlertTriangle size={14} />, color: "text-amber-500", filter: "atRisk" },
+    { label: "Non-Compliant (<50%)", count: nonCompliant.length, icon: <XCircle size={14} />, color: "text-red-500", filter: "nonCompliant" },
   ];
 
   return (
     <div className="card p-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
             <Shield size={18} />
           </div>
           <div>
-            <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>4-Day Office Compliance</h2>
-            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Office + Client + Split Day count toward requirement</p>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Overall 4-Day Office Compliance</h2>
+            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              % of weeks each employee met the 4-day office requirement (Office + Client + Split Day)
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -93,6 +120,27 @@ export default function ComplianceTracker({ analytics, selectedDept }: Props) {
             </svg>
           </div>
         </div>
+      </div>
+
+      {/* Date range & tracking info */}
+      <div className="flex flex-wrap items-center gap-4 mb-5 p-3 rounded-lg" style={{ background: "var(--bg-inset)", border: "1px solid var(--border-subtle)" }}>
+        <div className="flex items-center gap-2">
+          <Calendar size={13} style={{ color: "var(--text-muted)" }} />
+          <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
+            {formatDate(firstDate)} – {formatDate(lastDate)}
+          </span>
+        </div>
+        <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
+        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+          <strong style={{ color: "var(--text-secondary)" }}>{totalWorkingDays}</strong> working days tracked
+        </span>
+        <div className="w-px h-4" style={{ background: "var(--border-default)" }} />
+        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+          <strong style={{ color: "var(--text-secondary)" }}>{completeWeeks}</strong> complete weeks (4+ working days)
+          {totalWeeksTracked > completeWeeks && (
+            <span> out of {totalWeeksTracked} total</span>
+          )}
+        </span>
       </div>
 
       {/* Summary Row */}
@@ -133,10 +181,13 @@ export default function ComplianceTracker({ analytics, selectedDept }: Props) {
                 Department <SortIcon field="department" />
               </th>
               <th onClick={() => toggleSort("officeDays")} className="text-center py-2.5 px-3 font-medium cursor-pointer select-none" style={{ color: "var(--text-secondary)" }}>
-                Office <SortIcon field="officeDays" />
+                <span title="Total office days (Office + Client + Split Day) out of total working days">Office Days <SortIcon field="officeDays" /></span>
+              </th>
+              <th onClick={() => toggleSort("compliantWeeks")} className="text-center py-2.5 px-3 font-medium cursor-pointer select-none" style={{ color: "var(--text-secondary)" }}>
+                <span title="Weeks with 4+ office days out of total complete weeks">Weeks Met <SortIcon field="compliantWeeks" /></span>
               </th>
               <th onClick={() => toggleSort("compliance")} className="text-center py-2.5 px-3 font-medium cursor-pointer select-none" style={{ color: "var(--text-secondary)" }}>
-                Compliance <SortIcon field="compliance" />
+                <span title="Percentage of complete weeks where 4-day office requirement was met">Rate <SortIcon field="compliance" /></span>
               </th>
               <th className="text-center py-2.5 px-3 w-10"></th>
             </tr>
@@ -144,6 +195,8 @@ export default function ComplianceTracker({ analytics, selectedDept }: Props) {
           <tbody>
             {sorted.map((emp) => {
               const officeDays = emp.office + emp.clientLocation + emp.splitDay;
+              const empCompleteWeeks = emp.weeklyCompliance.filter(w => w.totalWorkDays >= 4);
+              const empCompliantWeeks = empCompleteWeeks.filter(w => w.isCompliant).length;
               return (
                 <tr key={emp.email} className="table-row-hover" style={{ borderTop: "1px solid var(--border-subtle)" }}>
                   <td className="py-2.5 px-3">
@@ -157,15 +210,34 @@ export default function ComplianceTracker({ analytics, selectedDept }: Props) {
                       </div>
                       <div>
                         <div className="font-medium text-[13px]" style={{ color: "var(--text-primary)" }}>{emp.name}</div>
-                        <div className="text-[11px] sm:hidden" style={{ color: "var(--text-muted)" }}>{emp.department}</div>
+                        <div className="text-[11px] sm:hidden" style={{ color: "var(--text-muted)" }}>
+                          {emp.departments?.length > 1 ? emp.departments.join(", ") : emp.department}
+                        </div>
                       </div>
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 hidden sm:table-cell text-[13px]" style={{ color: "var(--text-muted)" }}>{emp.department}</td>
-                  <td className="py-2.5 px-3 text-center font-semibold font-mono text-[13px]" style={{ color: "var(--text-primary)" }}>{officeDays}</td>
+                  <td className="py-2.5 px-3 hidden sm:table-cell text-[13px]" style={{ color: "var(--text-muted)" }}>
+                    {emp.departments?.length > 1 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {emp.departments.map((dept) => (
+                          <span key={dept} className="px-1.5 py-0.5 rounded text-[11px]" style={{ background: "var(--bg-inset)" }}>{dept}</span>
+                        ))}
+                      </div>
+                    ) : emp.department}
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    <span className="font-semibold font-mono text-[13px]" style={{ color: "var(--text-primary)" }}>{officeDays}</span>
+                    <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}> / {emp.totalDays}</span>
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    <span className={`font-semibold font-mono text-[13px] ${empCompliantWeeks > 0 ? "text-emerald-600 dark:text-emerald-400" : ""}`} style={empCompliantWeeks === 0 ? { color: "var(--text-muted)" } : undefined}>
+                      {empCompliantWeeks}
+                    </span>
+                    <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}> / {empCompleteWeeks.length}</span>
+                  </td>
                   <td className="py-2.5 px-3 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <div className="w-16 rounded-full h-1.5" style={{ background: "var(--bg-inset)" }}>
+                      <div className="w-14 rounded-full h-1.5" style={{ background: "var(--bg-inset)" }}>
                         <div
                           className={`h-1.5 rounded-full transition-all duration-300 ${emp.complianceRate >= 80 ? "bg-emerald-500" : emp.complianceRate >= 50 ? "bg-amber-500" : "bg-red-500"}`}
                           style={{ width: `${Math.min(emp.complianceRate, 100)}%` }}

@@ -15,7 +15,7 @@ interface Props {
 export default function TeamBreakdown({ employees, dates, selectedDept, selectedDate }: Props) {
   const filtered = selectedDept === "All"
     ? employees
-    : employees.filter((e) => e.department === selectedDept);
+    : employees.filter((e) => e.departments.includes(selectedDept));
 
   const allPastDates = dates.filter((d) => d <= selectedDate);
   const [page, setPage] = useState(0);
@@ -27,11 +27,14 @@ export default function TeamBreakdown({ employees, dates, selectedDept, selected
   const grouped = useMemo(() => {
     const map: Record<string, Employee[]> = {};
     filtered.forEach((e) => {
-      if (!map[e.department]) map[e.department] = [];
-      map[e.department].push(e);
+      const depts = selectedDept !== "All" ? [selectedDept] : (e.departments.length > 0 ? e.departments : [e.department || "Unassigned"]);
+      depts.forEach((dept) => {
+        if (!map[dept]) map[dept] = [];
+        map[dept].push(e);
+      });
     });
     return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
+  }, [filtered, selectedDept]);
 
   return (
     <div className="card p-5">

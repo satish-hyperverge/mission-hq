@@ -108,6 +108,7 @@ export function computeEmployeeAnalytics(
     name: employee.name,
     email: employee.email,
     department: employee.department,
+    departments: employee.departments || [],
     office,
     home,
     clientLocation,

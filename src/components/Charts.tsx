@@ -2,8 +2,9 @@
 
 import { Employee, STATUS_COLORS } from "@/lib/types";
 import { useTheme } from "@/lib/theme";
+import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart, ReferenceLine } from "recharts";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek, addDays, isBefore, isEqual } from "date-fns";
 
 const CHART_COLORS = {
   light: { grid: "#f1f5f9", tick: "#94a3b8", ref: "#ef4444", bg: "#ffffff", border: "#e2e8f0", text: "#0f172a", sub: "#64748b" },
@@ -40,31 +41,113 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
+// Holidays in YYYY-MM-DD format
+const HOLIDAYS = new Set([
+  "2026-04-03", "2026-05-01", "2026-08-15", "2026-10-02",
+  "2026-11-01", "2026-11-09", "2026-11-10", "2026-12-25",
+]);
+
+function isHolidayDate(day: Date): boolean {
+  const yyyy = day.getFullYear();
+  const mm = String(day.getMonth() + 1).padStart(2, "0");
+  const dd = String(day.getDate()).padStart(2, "0");
+  return HOLIDAYS.has(`${yyyy}-${mm}-${dd}`);
+}
+
+type WeekTab = "this" | "last";
 interface TrendProps { employees: Employee[]; dates: string[]; }
 
 export function DailyTrendChart({ employees, dates }: TrendProps) {
   const { theme } = useTheme();
   const c = CHART_COLORS[theme === "dark" ? "dark" : "light"];
-  const recentDates = dates.slice(-20);
+  const [weekTab, setWeekTab] = useState<WeekTab>("this");
 
-  const data = recentDates.map((d) => {
+  const today = new Date();
+  const thisMonday = startOfWeek(today, { weekStartsOn: 1 });
+  const lastMonday = addDays(thisMonday, -7);
+  const monday = weekTab === "this" ? thisMonday : lastMonday;
+
+  // Mon-Fri for the selected week
+  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(monday, i));
+  const dateSet = new Set(dates);
+
+  const data = weekDays.map((day) => {
+    const dateStr = format(day, "yyyy-MM-dd");
+    const holiday = isHolidayDate(day);
+    const dayLabel = format(day, "EEE, MMM d");
+    const label = holiday ? `${dayLabel} (Holiday)` : dayLabel;
+    const isPast = isBefore(day, today) || format(day, "yyyy-MM-dd") === format(today, "yyyy-MM-dd");
+    const hasData = dateSet.has(dateStr);
+
+    if (holiday) {
+      return { date: label, Office: 0, Home: 0, "Client Location": 0, "Split Day": 0, Travel: 0, Leave: 0, Pending: 0, Holiday: employees.length };
+    }
+
+    if (!isPast || !hasData) {
+      return { date: label, Office: 0, Home: 0, "Client Location": 0, "Split Day": 0, Travel: 0, Leave: 0, Pending: 0, Holiday: 0 };
+    }
+
     const counts: Record<string, number> = { Office: 0, Home: 0, "Client Location": 0, "Split Day": 0, Travel: 0, Leave: 0, Pending: 0 };
     employees.forEach((emp) => {
-      const status = emp.statuses[d];
+      const status = emp.statuses[dateStr];
       if (status && status in counts) counts[status]++;
     });
-    return { date: format(parseISO(d), "MMM d"), ...counts };
+    return { date: label, ...counts, Holiday: 0 };
   });
 
+  const weekLabel = `${format(weekDays[0], "MMM d")} – ${format(weekDays[4], "MMM d")}`;
+
+  // Custom X-axis tick to style holidays differently
+  const CustomXTick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value: string } }) => {
+    const value = payload?.value || "";
+    const isHol = value.includes("(Holiday)");
+    const displayLabel = value.replace(" (Holiday)", "");
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text x={0} y={0} dy={12} textAnchor="middle" fontSize={10} fill={isHol ? "#f59e0b" : c.tick}>
+          {displayLabel}
+        </text>
+        {isHol && (
+          <text x={0} y={0} dy={24} textAnchor="middle" fontSize={9} fill="#f59e0b" fontWeight={600}>
+            Holiday
+          </text>
+        )}
+      </g>
+    );
+  };
+
   return (
-    <ChartCard title="Daily Attendance Trend" subtitle={`Last ${recentDates.length} working days`}>
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Daily Attendance Trend</h2>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{weekLabel}</p>
+        </div>
+        <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: "var(--bg-inset)" }}>
+          <button onClick={() => setWeekTab("this")}
+            className="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
+            style={{
+              background: weekTab === "this" ? "var(--bg-surface)" : "transparent",
+              color: weekTab === "this" ? "var(--text-primary)" : "var(--text-muted)",
+              boxShadow: weekTab === "this" ? "var(--shadow-xs)" : "none",
+            }}>This Week</button>
+          <button onClick={() => setWeekTab("last")}
+            className="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
+            style={{
+              background: weekTab === "last" ? "var(--bg-surface)" : "transparent",
+              color: weekTab === "last" ? "var(--text-primary)" : "var(--text-muted)",
+              boxShadow: weekTab === "last" ? "var(--shadow-xs)" : "none",
+            }}>Last Week</button>
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} barSize={10} barGap={1}>
+        <BarChart data={data} barSize={14} barGap={1}>
           <CartesianGrid strokeDasharray="3 3" stroke={c.grid} vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 10, fill: c.tick }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="date" tick={<CustomXTick />} axisLine={false} tickLine={false} height={40} />
           <YAxis tick={{ fontSize: 10, fill: c.tick }} axisLine={false} tickLine={false} width={30} />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: theme === "dark" ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)" }} />
           <Legend wrapperStyle={{ fontSize: 10, paddingTop: 12 }} iconType="circle" iconSize={6} />
+          <Bar dataKey="Holiday" stackId="a" fill="#f59e0b" opacity={0.3} radius={[3, 3, 0, 0]} />
           <Bar dataKey="Office" stackId="a" fill={STATUS_COLORS.Office} />
           <Bar dataKey="Home" stackId="a" fill={STATUS_COLORS.Home} />
           <Bar dataKey="Client Location" stackId="a" fill={STATUS_COLORS["Client Location"]} />
@@ -74,7 +157,7 @@ export function DailyTrendChart({ employees, dates }: TrendProps) {
           <Bar dataKey="Pending" stackId="a" fill={STATUS_COLORS.Pending} radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
-    </ChartCard>
+    </div>
   );
 }
 
@@ -142,13 +225,16 @@ export function TeamComplianceChart({ employees, dates }: TeamComplianceProps) {
   const departments: Record<string, { total: number; officeDays: number }> = {};
 
   employees.forEach((emp) => {
-    if (!departments[emp.department]) departments[emp.department] = { total: 0, officeDays: 0 };
-    dates.slice(-5).forEach((d) => {
-      const status = emp.statuses[d];
-      departments[emp.department].total++;
-      if (status === "Office" || status === "Client Location" || status === "Split Day") {
-        departments[emp.department].officeDays++;
-      }
+    const depts = emp.departments?.length > 0 ? emp.departments : [emp.department || "Unassigned"];
+    depts.forEach((dept) => {
+      if (!departments[dept]) departments[dept] = { total: 0, officeDays: 0 };
+      dates.slice(-5).forEach((d) => {
+        const status = emp.statuses[d];
+        departments[dept].total++;
+        if (status === "Office" || status === "Client Location" || status === "Split Day") {
+          departments[dept].officeDays++;
+        }
+      });
     });
   });
 
