@@ -105,10 +105,10 @@ export default function StatsCards({ employees, date, previousDate }: Props) {
             </div>
           </div>
 
-          <div className="w-px h-9" style={{ background: "var(--border-default)" }} />
+          <div className="hidden sm:block w-px h-9" style={{ background: "var(--border-default)" }} />
 
-          {/* Pending */}
-          <div className="flex items-center gap-3">
+          {/* Pending — hidden on mobile */}
+          <div className="hidden sm:flex items-center gap-3">
             <div className="w-11 h-11 relative flex-shrink-0">
               <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
                 <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" className="text-gray-100 dark:text-slate-800" strokeWidth="2.5" />
