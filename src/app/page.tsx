@@ -116,10 +116,26 @@ export default function Dashboard() {
 
   const { theme, toggleTheme } = useTheme();
 
-  const [selectedDept, setSelectedDept] = useState("All");
+  const [selectedDept, setSelectedDept] = useState<string>(() => {
+    if (typeof window === "undefined") return "All";
+    return new URLSearchParams(window.location.search).get("dept") || "All";
+  });
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const current = params.get("dept") || "All";
+    if (current === selectedDept) return;
+    if (selectedDept === "All") params.delete("dept");
+    else params.set("dept", selectedDept);
+    const qs = params.toString();
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`;
+    window.history.replaceState(null, "", next);
+  }, [selectedDept]);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [directorySearch, setDirectorySearch] = useState("");
 
   const switchTab = useCallback((tab: Tab) => setActiveTab(tab), []);
 
@@ -587,18 +603,64 @@ export default function Dashboard() {
               <>
                 <TeamBreakdown employees={filteredEmployees} dates={dates} selectedDept={selectedDept} selectedDate={selectedDate} />
                 <div className="card p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Employee Directory</h2>
-                      <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{filteredEmployees.length} employees &middot; Click for details</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {filteredEmployees.map((emp, idx) => {
-                      const empAnalytics = analytics[idx];
-                      const todayStatus = emp.statuses[selectedDate] || "No Data";
-                      const initials = emp.name.split(" ").map(n => n[0]).join("").slice(0, 2);
-                      return (
+                  {(() => {
+                    const q = directorySearch.trim().toLowerCase();
+                    const directoryEmployees = q
+                      ? filteredEmployees.filter((e) =>
+                          e.name.toLowerCase().includes(q) ||
+                          e.email.toLowerCase().includes(q) ||
+                          e.departments.some((d) => d.toLowerCase().includes(q)) ||
+                          (e.department?.toLowerCase().includes(q) ?? false)
+                        )
+                      : filteredEmployees;
+                    return (
+                      <>
+                        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                          <div>
+                            <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Employee Directory</h2>
+                            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                              {directoryEmployees.length} {directoryEmployees.length === 1 ? "employee" : "employees"}
+                              {q && filteredEmployees.length !== directoryEmployees.length && ` of ${filteredEmployees.length}`}
+                              {" "}&middot; Click for details
+                            </p>
+                          </div>
+                          <div className="relative w-full sm:w-72">
+                            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
+                            <input
+                              type="text"
+                              value={directorySearch}
+                              onChange={(e) => setDirectorySearch(e.target.value)}
+                              placeholder="Search this list…"
+                              className="w-full pl-9 pr-8 py-2 text-[13px] rounded-lg border focus:outline-none transition-all"
+                              style={{
+                                background: "var(--bg-surface-secondary)",
+                                borderColor: "var(--border-default)",
+                                color: "var(--text-primary)",
+                              }}
+                            />
+                            {directorySearch && (
+                              <button
+                                onClick={() => setDirectorySearch("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full flex items-center justify-center"
+                                style={{ background: "var(--text-faint)" }}
+                                aria-label="Clear directory search"
+                              >
+                                <X size={9} className="text-white" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {directoryEmployees.length === 0 ? (
+                          <div className="py-12 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                            No employees match &ldquo;{directorySearch}&rdquo;
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                            {directoryEmployees.map((emp) => {
+                              const empAnalytics = allAnalytics.get(emp.email)!;
+                              const todayStatus = emp.statuses[selectedDate] || "No Data";
+                              const initials = emp.name.split(" ").map(n => n[0]).join("").slice(0, 2);
+                              return (
                         <button key={emp.email} onClick={() => setSelectedEmployee(emp)}
                           className="card-interactive text-left p-4 rounded-xl border focus-visible:ring-2 focus-visible:ring-indigo-500"
                           style={{ borderColor: "var(--border-default)", background: "var(--bg-surface)" }}>
@@ -633,10 +695,14 @@ export default function Dashboard() {
                               }`} style={{ width: `${Math.min(empAnalytics.complianceRate, 100)}%` }} />
                             </div>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </>
             )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Search, X, Calendar, Building } from "lucide-react";
+import { CustomSelect } from "./CustomSelect";
 
 interface Props {
   departments: string[];
@@ -71,51 +72,45 @@ export default function Filters({
         </div>
 
         {/* Department */}
-        <div className="relative">
-          <Building size={12} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
-          <select
-            value={selectedDept}
-            onChange={(e) => onDeptChange(e.target.value)}
-            className="pl-8 pr-7 py-2 text-[13px] border rounded-lg appearance-none cursor-pointer focus:outline-none transition-all"
-            style={{
-              background: selectedDept !== "All" ? "var(--accent-light)" : "var(--bg-surface-secondary)",
-              borderColor: selectedDept !== "All" ? "var(--accent-muted)" : "var(--border-default)",
-              color: "var(--text-primary)",
-            }}
-          >
-            <option value="All">All Departments</option>
-            {departments.map((dept) => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-          <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: "var(--text-muted)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        <CustomSelect
+          ariaLabel="Filter by department"
+          icon={<Building size={12} />}
+          value={selectedDept}
+          onChange={onDeptChange}
+          active={selectedDept !== "All"}
+          items={[
+            { value: "All", label: "All Departments" },
+            ...departments.map((dept) => ({ value: dept, label: dept })),
+          ]}
+        />
 
         {/* Date */}
-        <div className="relative">
-          <Calendar size={12} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
-          <select
-            value={selectedDate}
-            onChange={(e) => onDateChange(e.target.value)}
-            className="pl-8 pr-7 py-2 text-[13px] border rounded-lg appearance-none cursor-pointer focus:outline-none transition-all"
-            style={{
-              background: "var(--bg-surface-secondary)",
-              borderColor: "var(--border-default)",
-              color: "var(--text-primary)",
-            }}
-          >
-            {[...dates].reverse().slice(0, 30).map((d) => (
-              <option key={d} value={d}>
-                {new Date(d + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
-              </option>
-            ))}
-          </select>
-          <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: "var(--text-muted)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        <CustomSelect
+          ariaLabel="Pick a date"
+          icon={<Calendar size={12} />}
+          value={selectedDate}
+          onChange={onDateChange}
+          align="right"
+          searchable
+          searchPlaceholder="Search dates…"
+          items={[...dates].reverse().map((d) => {
+            const dt = new Date(d + "T00:00:00");
+            return {
+              value: d,
+              label: dt.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
+            };
+          })}
+          footer={
+            dates.length > 0 ? (
+              <div className="flex items-center justify-between">
+                <span>Tracking since</span>
+                <span className="font-mono font-medium" style={{ color: "var(--text-secondary)" }}>
+                  {new Date(dates[0] + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              </div>
+            ) : null
+          }
+        />
 
         {/* Clear */}
         {hasActiveFilters && (
