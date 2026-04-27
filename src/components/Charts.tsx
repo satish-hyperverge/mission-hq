@@ -2,9 +2,10 @@
 
 import { Employee, STATUS_COLORS } from "@/lib/types";
 import { useTheme } from "@/lib/theme";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart, ReferenceLine } from "recharts";
-import { format, parseISO, startOfWeek, addDays, isBefore, isEqual } from "date-fns";
+import { format, parseISO, startOfWeek, addDays, isBefore, startOfMonth, endOfMonth } from "date-fns";
+import { Sparkles, TrendingUp, TrendingDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 const CHART_COLORS = {
   light: { grid: "#f1f5f9", tick: "#94a3b8", ref: "#ef4444", bg: "#ffffff", border: "#e2e8f0", text: "#0f172a", sub: "#64748b" },
@@ -54,18 +55,18 @@ function isHolidayDate(day: Date): boolean {
   return HOLIDAYS.has(`${yyyy}-${mm}-${dd}`);
 }
 
-type WeekTab = "this" | "last";
+type PeriodTab = "this" | "last" | "month";
 interface TrendProps { employees: Employee[]; dates: string[]; }
 
 export function DailyTrendChart({ employees, dates }: TrendProps) {
   const { theme } = useTheme();
   const c = CHART_COLORS[theme === "dark" ? "dark" : "light"];
-  const [weekTab, setWeekTab] = useState<WeekTab>("this");
+  const [periodTab, setPeriodTab] = useState<PeriodTab>("this");
 
   const today = new Date();
   const thisMonday = startOfWeek(today, { weekStartsOn: 1 });
   const lastMonday = addDays(thisMonday, -7);
-  const monday = weekTab === "this" ? thisMonday : lastMonday;
+  const monday = periodTab === "last" ? lastMonday : thisMonday;
 
   // Mon-Fri for the selected week
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(monday, i));
@@ -116,47 +117,517 @@ export function DailyTrendChart({ employees, dates }: TrendProps) {
     );
   };
 
+  const subtitle = periodTab === "month" ? "" : weekLabel;
+
   return (
     <div className="card p-5">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div>
           <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Daily Attendance Trend</h2>
-          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{weekLabel}</p>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{subtitle}</p>
         </div>
         <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: "var(--bg-inset)" }}>
-          <button onClick={() => setWeekTab("this")}
-            className="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
-            style={{
-              background: weekTab === "this" ? "var(--bg-surface)" : "transparent",
-              color: weekTab === "this" ? "var(--text-primary)" : "var(--text-muted)",
-              boxShadow: weekTab === "this" ? "var(--shadow-xs)" : "none",
-            }}>This Week</button>
-          <button onClick={() => setWeekTab("last")}
-            className="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
-            style={{
-              background: weekTab === "last" ? "var(--bg-surface)" : "transparent",
-              color: weekTab === "last" ? "var(--text-primary)" : "var(--text-muted)",
-              boxShadow: weekTab === "last" ? "var(--shadow-xs)" : "none",
-            }}>Last Week</button>
+          {(["this", "last", "month"] as PeriodTab[]).map((p) => (
+            <button key={p} onClick={() => setPeriodTab(p)}
+              className="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
+              style={{
+                background: periodTab === p ? "var(--bg-surface)" : "transparent",
+                color: periodTab === p ? "var(--text-primary)" : "var(--text-muted)",
+                boxShadow: periodTab === p ? "var(--shadow-xs)" : "none",
+              }}>
+              {p === "this" ? "This Week" : p === "last" ? "Last Week" : "This Month"}
+            </button>
+          ))}
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} barSize={14} barGap={1}>
-          <CartesianGrid strokeDasharray="3 3" stroke={c.grid} vertical={false} />
-          <XAxis dataKey="date" tick={<CustomXTick />} axisLine={false} tickLine={false} height={40} />
-          <YAxis tick={{ fontSize: 10, fill: c.tick }} axisLine={false} tickLine={false} width={30} />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: theme === "dark" ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)" }} />
-          <Legend wrapperStyle={{ fontSize: 10, paddingTop: 12 }} iconType="circle" iconSize={6} />
-          <Bar dataKey="Holiday" stackId="a" fill="#f59e0b" opacity={0.3} radius={[3, 3, 0, 0]} />
-          <Bar dataKey="Office" stackId="a" fill={STATUS_COLORS.Office} />
-          <Bar dataKey="Home" stackId="a" fill={STATUS_COLORS.Home} />
-          <Bar dataKey="Client Location" stackId="a" fill={STATUS_COLORS["Client Location"]} />
-          <Bar dataKey="Split Day" stackId="a" fill={STATUS_COLORS["Split Day"]} />
-          <Bar dataKey="Travel" stackId="a" fill={STATUS_COLORS.Travel} />
-          <Bar dataKey="Leave" stackId="a" fill={STATUS_COLORS.Leave} />
-          <Bar dataKey="Pending" stackId="a" fill={STATUS_COLORS.Pending} radius={[3, 3, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+
+      {periodTab === "month" ? (
+        <MonthCalendarHeatmap employees={employees} dates={dates} />
+      ) : (
+        <div className="animate-fade-in">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data} barSize={14} barGap={1}>
+              <CartesianGrid strokeDasharray="3 3" stroke={c.grid} vertical={false} />
+              <XAxis dataKey="date" tick={<CustomXTick />} axisLine={false} tickLine={false} height={40} />
+              <YAxis tick={{ fontSize: 10, fill: c.tick }} axisLine={false} tickLine={false} width={30} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: theme === "dark" ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)" }} />
+              <Legend wrapperStyle={{ fontSize: 10, paddingTop: 12 }} iconType="circle" iconSize={6} />
+              <Bar dataKey="Holiday" stackId="a" fill="#f59e0b" opacity={0.3} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Office" stackId="a" fill={STATUS_COLORS.Office} />
+              <Bar dataKey="Home" stackId="a" fill={STATUS_COLORS.Home} />
+              <Bar dataKey="Client Location" stackId="a" fill={STATUS_COLORS["Client Location"]} />
+              <Bar dataKey="Split Day" stackId="a" fill={STATUS_COLORS["Split Day"]} />
+              <Bar dataKey="Travel" stackId="a" fill={STATUS_COLORS.Travel} />
+              <Bar dataKey="Leave" stackId="a" fill={STATUS_COLORS.Leave} />
+              <Bar dataKey="Pending" stackId="a" fill={STATUS_COLORS.Pending} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Month Calendar Heatmap ──────────────────────────────────────
+interface DayStat {
+  day: Date;
+  dateStr: string;
+  inMonth: boolean;
+  isHoliday: boolean;
+  isFuture: boolean;
+  isToday: boolean;
+  hasData: boolean;
+  total: number;
+  office: number;
+  officePct: number;
+  counts: Record<string, number>;
+}
+
+const OFFICE_KEYS = ["Office", "Client Location", "Split Day"] as const;
+
+function MonthCalendarHeatmap({ employees, dates }: { employees: Employee[]; dates: string[] }) {
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+
+  // Months that have at least one date in the data set, sorted ascending
+  const monthsWithData = useMemo(() => {
+    const set = new Set<string>();
+    dates.forEach((d) => set.add(d.slice(0, 7))); // "yyyy-MM"
+    return Array.from(set).sort();
+  }, [dates]);
+
+  // Initial viewed month: today's month if it has data, else the latest month with data
+  const initialMonthKey = useMemo(() => {
+    const todayKey = format(startOfMonth(today), "yyyy-MM");
+    if (monthsWithData.includes(todayKey)) return todayKey;
+    return monthsWithData[monthsWithData.length - 1] ?? todayKey;
+  }, [monthsWithData, today]);
+
+  const [viewedMonthKey, setViewedMonthKey] = useState(initialMonthKey);
+  const viewedMonth = useMemo(() => parseISO(`${viewedMonthKey}-01`), [viewedMonthKey]);
+
+  const idx = monthsWithData.indexOf(viewedMonthKey);
+  const prevMonthKey = idx > 0 ? monthsWithData[idx - 1] : null;
+  const nextMonthKey = idx >= 0 && idx < monthsWithData.length - 1 ? monthsWithData[idx + 1] : null;
+  const todayMonthKey = format(startOfMonth(today), "yyyy-MM");
+  const isCurrentMonth = viewedMonthKey === todayMonthKey;
+  const todayAvailable = monthsWithData.includes(todayMonthKey);
+
+  // Keyboard shortcuts (only mounted while month tab is active)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowLeft" && prevMonthKey) { e.preventDefault(); setViewedMonthKey(prevMonthKey); }
+      else if (e.key === "ArrowRight" && nextMonthKey) { e.preventDefault(); setViewedMonthKey(nextMonthKey); }
+      else if ((e.key === "t" || e.key === "T") && todayAvailable && !isCurrentMonth) { e.preventDefault(); setViewedMonthKey(todayMonthKey); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [prevMonthKey, nextMonthKey, todayAvailable, isCurrentMonth, todayMonthKey]);
+
+  const monthStart = startOfMonth(viewedMonth);
+  const monthEnd = endOfMonth(viewedMonth);
+  const firstWeekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const dateSet = new Set(dates);
+
+  // Build week rows that span the month (Mon-Fri only)
+  const weeks: Date[][] = [];
+  let cursor = firstWeekStart;
+  while (cursor <= monthEnd) {
+    weeks.push(Array.from({ length: 5 }, (_, i) => addDays(cursor, i)));
+    cursor = addDays(cursor, 7);
+  }
+
+  const buildStat = (day: Date): DayStat => {
+    const dateStr = format(day, "yyyy-MM-dd");
+    const inMonth = day.getMonth() === monthStart.getMonth();
+    const isHoliday = HOLIDAYS.has(dateStr);
+    const isFuture = isBefore(today, day) && dateStr !== todayStr;
+    const isToday = dateStr === todayStr;
+    const hasData = dateSet.has(dateStr);
+    const counts: Record<string, number> = { Office: 0, Home: 0, "Client Location": 0, "Split Day": 0, Travel: 0, Leave: 0, Pending: 0 };
+
+    if (inMonth && !isFuture && !isHoliday && hasData) {
+      employees.forEach((emp) => {
+        const s = emp.statuses[dateStr];
+        if (s && s in counts) counts[s]++;
+      });
+    }
+    const total = employees.length || 1;
+    const office = counts.Office + counts["Client Location"] + counts["Split Day"];
+    const officePct = inMonth && !isFuture && !isHoliday && hasData ? Math.round((office / total) * 100) : 0;
+    return { day, dateStr, inMonth, isHoliday, isFuture, isToday, hasData, total, office, officePct, counts };
+  };
+
+  const allCells = weeks.flatMap((w) => w.map(buildStat));
+  const validDays = allCells.filter((d) => d.inMonth && !d.isHoliday && !d.isFuture && d.hasData);
+  const avgOffice = validDays.length > 0
+    ? Math.round(validDays.reduce((sum, d) => sum + d.officePct, 0) / validDays.length)
+    : 0;
+  const bestDay = validDays.reduce<DayStat | null>((b, d) => (!b || d.officePct > b.officePct ? d : b), null);
+  const worstDay = validDays.reduce<DayStat | null>((w, d) => (!w || d.officePct < w.officePct ? d : w), null);
+  const totalWorkingDaysInMonth = allCells.filter((d) => d.inMonth && !d.isHoliday).length;
+
+  return (
+    <div className="animate-fade-in">
+      {/* Month nav */}
+      <div className="flex items-center justify-center gap-2 mb-3">
+        <NavIconButton
+          icon={<ChevronLeft size={15} />}
+          disabled={!prevMonthKey}
+          onClick={() => prevMonthKey && setViewedMonthKey(prevMonthKey)}
+          tooltipLabel={prevMonthKey ? format(parseISO(prevMonthKey + "-01"), "MMMM yyyy") : "No earlier data"}
+          shortcut="←"
+        />
+
+        <div className="flex items-center gap-2 min-w-[150px] justify-center">
+          <h3 className="text-[13px] font-semibold tracking-tight tabular-nums" style={{ color: "var(--text-primary)" }}>
+            {format(viewedMonth, "MMMM yyyy")}
+          </h3>
+        </div>
+
+        <NavIconButton
+          icon={<ChevronRight size={15} />}
+          disabled={!nextMonthKey}
+          onClick={() => nextMonthKey && setViewedMonthKey(nextMonthKey)}
+          tooltipLabel={nextMonthKey ? format(parseISO(nextMonthKey + "-01"), "MMMM yyyy") : "No later data"}
+          shortcut="→"
+        />
+
+        <span className="mx-1 h-5 w-px" style={{ background: "var(--border-subtle)" }} />
+
+        <NavIconButton
+          icon={<span className="text-[11px] font-bold tracking-tight">Today</span>}
+          disabled={!todayAvailable}
+          active={isCurrentMonth}
+          onClick={() => setViewedMonthKey(todayMonthKey)}
+          tooltipLabel={isCurrentMonth ? "You're here" : todayAvailable ? format(startOfMonth(today), "MMMM yyyy") : "No data this month"}
+          shortcut="T"
+          wide
+        />
+      </div>
+
+      {/* Month summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+        <SummaryCard
+          label="Avg Office"
+          value={`${avgOffice}%`}
+          accent={avgOffice >= 80 ? "emerald" : avgOffice >= 60 ? "amber" : "red"}
+        />
+        <SummaryCard
+          label="Days Tracked"
+          value={`${validDays.length}/${totalWorkingDaysInMonth}`}
+          accent="indigo"
+        />
+        <SummaryCard
+          label="Best Day"
+          value={bestDay ? `${bestDay.officePct}%` : "—"}
+          sub={bestDay ? format(bestDay.day, "EEE, MMM d") : ""}
+          accent="emerald"
+          icon={<TrendingUp size={11} />}
+        />
+        <SummaryCard
+          label="Lowest Day"
+          value={worstDay ? `${worstDay.officePct}%` : "—"}
+          sub={worstDay ? format(worstDay.day, "EEE, MMM d") : ""}
+          accent="red"
+          icon={<TrendingDown size={11} />}
+        />
+      </div>
+
+      {/* Day-of-week header */}
+      <div className="grid grid-cols-5 gap-2 mb-1.5 px-1">
+        {["Mon", "Tue", "Wed", "Thu", "Fri"].map((d) => (
+          <div key={d} className="text-[10px] font-semibold uppercase tracking-wider text-center" style={{ color: "var(--text-muted)" }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-5 gap-2">
+        {allCells.map((stat) => (
+          <DayCell key={stat.dateStr} stat={stat} isBest={!!bestDay && stat.dateStr === bestDay.dateStr} />
+        ))}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-4 text-[10px]" style={{ color: "var(--text-muted)" }}>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded" style={{ background: "rgba(34, 197, 94, 0.18)", border: "1px solid rgba(34, 197, 94, 0.35)" }} /> ≥80%
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded" style={{ background: "rgba(245, 158, 11, 0.18)", border: "1px solid rgba(245, 158, 11, 0.35)" }} /> 60–79%
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded" style={{ background: "rgba(239, 68, 68, 0.14)", border: "1px solid rgba(239, 68, 68, 0.3)" }} /> &lt;60%
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded" style={{ background: "rgba(245, 158, 11, 0.18)", border: "1px dashed rgba(245, 158, 11, 0.5)" }} /> Holiday
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function NavIconButton({ icon, disabled, active, onClick, tooltipLabel, shortcut, wide }: {
+  icon: React.ReactNode;
+  disabled: boolean;
+  active?: boolean;
+  onClick: () => void;
+  tooltipLabel: string;
+  shortcut: string;
+  wide?: boolean;
+}) {
+  const baseColor = active ? "var(--accent)" : "var(--text-secondary)";
+  const baseBg = active ? "var(--accent-light)" : "var(--bg-inset)";
+  const baseBorder = active ? "var(--accent-muted)" : "var(--border-subtle)";
+
+  return (
+    <div className="group relative inline-flex">
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={tooltipLabel}
+        aria-current={active ? "true" : undefined}
+        className={`flex items-center justify-center rounded-md transition-all ${wide ? "h-7 px-2.5" : "w-7 h-7"} disabled:cursor-not-allowed`}
+        style={{
+          color: disabled ? "var(--text-faint)" : baseColor,
+          background: baseBg,
+          border: `1px solid ${baseBorder}`,
+          opacity: disabled ? 0.5 : 1,
+          boxShadow: active ? "0 0 0 2px var(--accent-light)" : "none",
+          fontWeight: active ? 700 : undefined,
+        }}
+        onMouseEnter={(e) => {
+          if (!disabled && !active) {
+            e.currentTarget.style.background = "var(--bg-surface-hover)";
+            e.currentTarget.style.color = "var(--text-primary)";
+            e.currentTarget.style.borderColor = "var(--border-default)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = baseBg;
+          e.currentTarget.style.color = disabled ? "var(--text-faint)" : baseColor;
+          e.currentTarget.style.borderColor = baseBorder;
+        }}
+      >
+        {icon}
+      </button>
+
+      {/* Slack-style tooltip */}
+      <div
+        role="tooltip"
+        className="pointer-events-none opacity-0 group-hover:opacity-100 absolute left-1/2 -translate-x-1/2 top-full mt-2 z-30 transition-opacity duration-150"
+      >
+        <div
+          className="rounded-lg px-2.5 py-2 whitespace-nowrap flex items-center gap-2"
+          style={{
+            background: "#0f172a",
+            color: "#f1f5f9",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          }}
+        >
+          <span className="text-[11px] font-medium">{tooltipLabel}</span>
+          {!disabled && (
+            <kbd
+              className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded leading-none"
+              style={{ background: "#1e293b", color: "#cbd5e1", border: "1px solid #334155" }}
+            >
+              {shortcut}
+            </kbd>
+          )}
+          <span
+            className="absolute left-1/2 -translate-x-1/2 bottom-full w-2 h-2 rotate-45"
+            style={{ background: "#0f172a", marginBottom: "-4px" }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value, sub, accent, icon }: {
+  label: string; value: string; sub?: string;
+  accent: "emerald" | "amber" | "red" | "indigo";
+  icon?: React.ReactNode;
+}) {
+  const accentColors: Record<string, string> = {
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    amber: "text-amber-600 dark:text-amber-400",
+    red: "text-red-600 dark:text-red-400",
+    indigo: "text-indigo-600 dark:text-indigo-400",
+  };
+  return (
+    <div className="px-2.5 py-1.5 rounded-lg border flex items-center justify-between gap-2" style={{ background: "var(--bg-inset)", borderColor: "var(--border-subtle)" }}>
+      <div className="min-w-0">
+        <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+          {icon}<span className="truncate">{label}</span>
+        </div>
+        {sub && <div className="text-[9.5px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{sub}</div>}
+      </div>
+      <div className={`text-[15px] font-bold font-mono leading-none flex-shrink-0 ${accentColors[accent]}`}>{value}</div>
+    </div>
+  );
+}
+
+function DayCell({ stat, isBest }: { stat: DayStat; isBest: boolean }) {
+  const { day, inMonth, isHoliday, isFuture, isToday, hasData, officePct, counts, total } = stat;
+
+  // Background tint
+  let bg = "transparent";
+  let borderColor = "var(--border-subtle)";
+  if (!inMonth) {
+    bg = "transparent";
+  } else if (isHoliday) {
+    bg = "rgba(245, 158, 11, 0.15)";
+    borderColor = "rgba(245, 158, 11, 0.35)";
+  } else if (isFuture) {
+    bg = "var(--bg-inset)";
+  } else if (!hasData) {
+    bg = "var(--bg-inset)";
+  } else if (officePct >= 80) {
+    bg = "rgba(34, 197, 94, 0.14)";
+    borderColor = "rgba(34, 197, 94, 0.32)";
+  } else if (officePct >= 60) {
+    bg = "rgba(245, 158, 11, 0.14)";
+    borderColor = "rgba(245, 158, 11, 0.32)";
+  } else {
+    bg = "rgba(239, 68, 68, 0.10)";
+    borderColor = "rgba(239, 68, 68, 0.25)";
+  }
+
+  const ring = isToday ? "0 0 0 2px var(--accent)" : isBest ? "0 0 0 1.5px rgba(234, 179, 8, 0.55)" : "none";
+  const opacity = !inMonth ? 0.35 : isFuture ? 0.5 : 1;
+
+  // Build mini-stack of office vs other
+  const dayCount = hasData ? Object.values(counts).reduce((a, b) => a + b, 0) || total : 0;
+
+  const interactive = inMonth && !isFuture;
+  const breakdownEntries = Object.entries(counts).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+
+  return (
+    <div className="group relative">
+      <div
+        className="relative aspect-[4/2] rounded-lg p-3 transition-all hover:scale-[1.03] hover:z-10"
+        style={{
+          background: bg,
+          border: `1px solid ${borderColor}`,
+          boxShadow: ring,
+          opacity,
+          cursor: interactive ? "pointer" : "default",
+        }}
+      >
+        {/* date number */}
+        <div className="flex items-start justify-between">
+          <span className="text-[10px] font-semibold font-mono leading-none" style={{ color: isToday ? "var(--accent)" : inMonth ? "var(--text-primary)" : "var(--text-muted)" }}>
+            {format(day, "d")}
+          </span>
+          {isBest && <Sparkles size={9} className="text-amber-500" />}
+          {isToday && !isBest && <span className="text-[7px] font-bold uppercase px-1 py-0.5 rounded leading-none" style={{ background: "var(--accent)", color: "white" }}>Today</span>}
+        </div>
+
+        {/* center content */}
+        {inMonth && !isFuture && !isHoliday && hasData && (
+          <>
+            <div className="absolute inset-x-1 top-[55%] -translate-y-1/2 text-center">
+              <div className="text-[13px] font-bold font-mono leading-none" style={{ color: "var(--text-primary)" }}>{officePct}<span className="text-[8px]">%</span></div>
+              <div className="text-[7.5px] mt-0.5 leading-none" style={{ color: "var(--text-muted)" }}>{stat.office}/{dayCount}</div>
+            </div>
+
+            {/* stacked mini-bar at the bottom */}
+            <div className="absolute inset-x-2 bottom-0.5 h-[2.5px] rounded-full overflow-hidden flex" style={{ background: "var(--bg-surface-secondary)" }}>
+              {OFFICE_KEYS.map((k) => counts[k] > 0 && (
+                <div key={k} style={{ width: `${(counts[k] / dayCount) * 100}%`, background: STATUS_COLORS[k] }} />
+              ))}
+              {(["Home", "Travel", "Leave", "Pending"] as const).map((k) => counts[k] > 0 && (
+                <div key={k} style={{ width: `${(counts[k] / dayCount) * 100}%`, background: STATUS_COLORS[k], opacity: 0.55 }} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {inMonth && isHoliday && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-[9px] font-semibold tracking-wide" style={{ color: "#d97706" }}>Holiday</div>
+          </div>
+        )}
+
+        {inMonth && isFuture && !isHoliday && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full" style={{ background: "var(--text-faint)" }} />
+          </div>
+        )}
+      </div>
+
+      {/* Custom tooltip — shown on hover */}
+      {inMonth && (
+        <div
+          role="tooltip"
+          className="day-tooltip pointer-events-none opacity-0 group-hover:opacity-100 absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-30 transition-opacity duration-150"
+        >
+          <div
+            className="rounded-xl px-3 py-2.5 min-w-[180px]"
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border-default)",
+              boxShadow: "var(--shadow-lg)",
+            }}
+          >
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <div className="text-[11px] font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
+                {format(day, "EEE, MMM d, yyyy")}
+              </div>
+              {isToday && (
+                <span className="text-[8px] font-bold uppercase px-1 py-0.5 rounded leading-none" style={{ background: "var(--accent)", color: "white" }}>Today</span>
+              )}
+            </div>
+
+            {isHoliday ? (
+              <div className="text-[11px] font-medium flex items-center gap-1.5" style={{ color: "#d97706" }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#d97706" }} />
+                Holiday
+              </div>
+            ) : isFuture ? (
+              <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>Upcoming</div>
+            ) : !hasData ? (
+              <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>No data yet</div>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2 mb-2 pb-2" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                  <span className={`text-lg font-bold font-mono leading-none ${
+                    officePct >= 80 ? "text-emerald-600 dark:text-emerald-400"
+                      : officePct >= 60 ? "text-amber-600 dark:text-amber-400"
+                        : "text-red-500 dark:text-red-400"
+                  }`}>{officePct}%</span>
+                  <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>in office · {stat.office}/{dayCount}</span>
+                </div>
+                <div className="space-y-1">
+                  {breakdownEntries.map(([k, v]) => (
+                    <div key={k} className="flex items-center gap-2 text-[10.5px]">
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: STATUS_COLORS[k] }} />
+                      <span className="flex-1" style={{ color: "var(--text-secondary)" }}>{k}</span>
+                      <span className="font-mono font-semibold" style={{ color: "var(--text-primary)" }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* arrow */}
+            <span
+              className="absolute left-1/2 -translate-x-1/2 top-full w-2.5 h-2.5 rotate-45"
+              style={{
+                background: "var(--bg-surface)",
+                borderRight: "1px solid var(--border-default)",
+                borderBottom: "1px solid var(--border-default)",
+                marginTop: "-5px",
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
