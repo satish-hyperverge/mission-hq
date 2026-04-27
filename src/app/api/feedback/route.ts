@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -35,6 +35,7 @@ const EXT_BY_MIME: Record<string, string> = {
 async function uploadDataUrl(
   dataUrl: string | undefined,
   pathPrefix: string,
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
 ): Promise<string | null> {
   if (!dataUrl) return null;
   if (!dataUrl.startsWith("data:")) return dataUrl; // already a URL, pass through
@@ -47,16 +48,22 @@ async function uploadDataUrl(
   const ext = EXT_BY_MIME[mime] ?? mime.split("/")[1]?.split("+")[0] ?? "bin";
   const path = `${pathPrefix}.${ext}`;
 
-  const { error } = await supabaseAdmin.storage
+  const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, buffer, { contentType: mime, upsert: false });
   if (error) throw new Error(`storage upload failed (${path}): ${error.message}`);
 
-  const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
 
 export async function POST(request: Request) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    console.warn("[api/feedback] Supabase env vars missing — skipping save");
+    return NextResponse.json({ skipped: true }, { status: 200 });
+  }
+
   let data: IncomingPayload;
   try {
     data = (await request.json()) as IncomingPayload;
@@ -71,9 +78,9 @@ export async function POST(request: Request) {
   let attachmentUrl: string | null;
   try {
     [screenshotUrl, videoUrl, attachmentUrl] = await Promise.all([
-      uploadDataUrl(data.screenshot, `${id}/screenshot`),
-      uploadDataUrl(data.video, `${id}/recording`),
-      uploadDataUrl(data.attachment, `${id}/attachment`),
+      uploadDataUrl(data.screenshot, `${id}/screenshot`, supabase),
+      uploadDataUrl(data.video, `${id}/recording`, supabase),
+      uploadDataUrl(data.attachment, `${id}/attachment`, supabase),
     ]);
   } catch (err) {
     console.error("[api/feedback] upload failed:", err);
@@ -106,7 +113,7 @@ export async function POST(request: Request) {
     raw: rawSlim,
   };
 
-  const { error } = await supabaseAdmin
+  const { error } = await supabase
     .from("feedback")
     .insert(row)
     .select("id")
