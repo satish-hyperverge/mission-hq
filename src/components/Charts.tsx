@@ -55,22 +55,43 @@ function isHolidayDate(day: Date): boolean {
   return HOLIDAYS.has(`${yyyy}-${mm}-${dd}`);
 }
 
-type PeriodTab = "this" | "last" | "month";
+type PeriodTab = "week" | "month";
 interface TrendProps { employees: Employee[]; dates: string[]; }
 
 export function DailyTrendChart({ employees, dates }: TrendProps) {
   const { theme } = useTheme();
   const c = CHART_COLORS[theme === "dark" ? "dark" : "light"];
-  const [periodTab, setPeriodTab] = useState<PeriodTab>("this");
+  const [periodTab, setPeriodTab] = useState<PeriodTab>("week");
 
-  const today = new Date();
-  const thisMonday = startOfWeek(today, { weekStartsOn: 1 });
-  const lastMonday = addDays(thisMonday, -7);
-  const monday = periodTab === "last" ? lastMonday : thisMonday;
+  const today = useMemo(() => new Date(), []);
+  const thisMonday = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), [today]);
+  const thisMondayKey = format(thisMonday, "yyyy-MM-dd");
 
-  // Mon-Fri for the selected week
-  const weekDays = Array.from({ length: 5 }, (_, i) => addDays(monday, i));
-  const dateSet = new Set(dates);
+  // Earliest Monday we have data for — caps the back-navigation
+  const earliestMondayKey = useMemo(() => {
+    if (dates.length === 0) return thisMondayKey;
+    const sorted = [...dates].sort();
+    const earliest = parseISO(sorted[0]);
+    return format(startOfWeek(earliest, { weekStartsOn: 1 }), "yyyy-MM-dd");
+  }, [dates, thisMondayKey]);
+
+  const [viewedMondayKey, setViewedMondayKey] = useState(thisMondayKey);
+  const viewedMonday = useMemo(() => parseISO(viewedMondayKey), [viewedMondayKey]);
+
+  const prevMondayKey = viewedMondayKey > earliestMondayKey
+    ? format(addDays(viewedMonday, -7), "yyyy-MM-dd")
+    : null;
+  const nextMondayKey = viewedMondayKey < thisMondayKey
+    ? format(addDays(viewedMonday, 7), "yyyy-MM-dd")
+    : null;
+  const isCurrentWeek = viewedMondayKey === thisMondayKey;
+
+  // Mon-Fri for the viewed week
+  const weekDays = useMemo(
+    () => Array.from({ length: 5 }, (_, i) => addDays(viewedMonday, i)),
+    [viewedMonday]
+  );
+  const dateSet = useMemo(() => new Set(dates), [dates]);
 
   const data = weekDays.map((day) => {
     const dateStr = format(day, "yyyy-MM-dd");
@@ -96,7 +117,21 @@ export function DailyTrendChart({ employees, dates }: TrendProps) {
     return { date: label, ...counts, Holiday: 0 };
   });
 
-  const weekLabel = `${format(weekDays[0], "MMM d")} – ${format(weekDays[4], "MMM d")}`;
+  const weekLabel = `${format(weekDays[0], "MMM d")} – ${format(weekDays[4], "MMM d, yyyy")}`;
+
+  // Keyboard nav for week view (←/→/T) — only mounted while week tab is active
+  useEffect(() => {
+    if (periodTab !== "week") return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowLeft" && prevMondayKey) { e.preventDefault(); setViewedMondayKey(prevMondayKey); }
+      else if (e.key === "ArrowRight" && nextMondayKey) { e.preventDefault(); setViewedMondayKey(nextMondayKey); }
+      else if ((e.key === "t" || e.key === "T") && !isCurrentWeek) { e.preventDefault(); setViewedMondayKey(thisMondayKey); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [periodTab, prevMondayKey, nextMondayKey, isCurrentWeek, thisMondayKey]);
 
   // Custom X-axis tick to style holidays differently
   const CustomXTick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value: string } }) => {
@@ -117,17 +152,17 @@ export function DailyTrendChart({ employees, dates }: TrendProps) {
     );
   };
 
-  const subtitle = periodTab === "month" ? "" : weekLabel;
-
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div>
           <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Daily Attendance Trend</h2>
-          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{subtitle}</p>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+            {periodTab === "week" ? (isCurrentWeek ? "This week" : "Browsing past week") : ""}
+          </p>
         </div>
         <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: "var(--bg-inset)" }}>
-          {(["this", "last", "month"] as PeriodTab[]).map((p) => (
+          {(["week", "month"] as PeriodTab[]).map((p) => (
             <button key={p} onClick={() => setPeriodTab(p)}
               className="px-3 py-1.5 text-xs font-medium rounded-md transition-all"
               style={{
@@ -135,7 +170,7 @@ export function DailyTrendChart({ employees, dates }: TrendProps) {
                 color: periodTab === p ? "var(--text-primary)" : "var(--text-muted)",
                 boxShadow: periodTab === p ? "var(--shadow-xs)" : "none",
               }}>
-              {p === "this" ? "This Week" : p === "last" ? "Last Week" : "This Month"}
+              {p === "week" ? "Week" : "Month"}
             </button>
           ))}
         </div>
@@ -145,6 +180,43 @@ export function DailyTrendChart({ employees, dates }: TrendProps) {
         <MonthCalendarHeatmap employees={employees} dates={dates} />
       ) : (
         <div className="animate-fade-in">
+          {/* Week nav */}
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <NavIconButton
+              icon={<ChevronLeft size={15} />}
+              disabled={!prevMondayKey}
+              onClick={() => prevMondayKey && setViewedMondayKey(prevMondayKey)}
+              tooltipLabel={prevMondayKey ? `Week of ${format(parseISO(prevMondayKey), "MMM d")}` : "No earlier data"}
+              shortcut="←"
+            />
+
+            <div className="flex items-center gap-2 min-w-[180px] justify-center">
+              <h3 className="text-[13px] font-semibold tracking-tight tabular-nums" style={{ color: "var(--text-primary)" }}>
+                {weekLabel}
+              </h3>
+            </div>
+
+            <NavIconButton
+              icon={<ChevronRight size={15} />}
+              disabled={!nextMondayKey}
+              onClick={() => nextMondayKey && setViewedMondayKey(nextMondayKey)}
+              tooltipLabel={nextMondayKey ? `Week of ${format(parseISO(nextMondayKey), "MMM d")}` : "No later data"}
+              shortcut="→"
+            />
+
+            <span className="mx-1 h-5 w-px" style={{ background: "var(--border-subtle)" }} />
+
+            <NavIconButton
+              icon={<span className="text-[11px] font-bold tracking-tight">This Week</span>}
+              disabled={false}
+              active={isCurrentWeek}
+              onClick={() => setViewedMondayKey(thisMondayKey)}
+              tooltipLabel={isCurrentWeek ? "You're here" : `Week of ${format(thisMonday, "MMM d")}`}
+              shortcut="T"
+              wide
+            />
+          </div>
+
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={data} barSize={14} barGap={1}>
               <CartesianGrid strokeDasharray="3 3" stroke={c.grid} vertical={false} />

@@ -111,7 +111,11 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "overview";
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return (["overview", "compliance", "team", "trends"].includes(t || "") ? t : "overview") as Tab;
+  });
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
 
@@ -121,19 +125,25 @@ export default function Dashboard() {
     if (typeof window === "undefined") return "All";
     return new URLSearchParams(window.location.search).get("dept") || "All";
   });
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("q") || "";
+  });
 
+  // Sync filter state → URL (so tab + filters can be shared via link)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    const current = params.get("dept") || "All";
-    if (current === selectedDept) return;
-    if (selectedDept === "All") params.delete("dept");
-    else params.set("dept", selectedDept);
+    if (activeTab === "overview") params.delete("tab"); else params.set("tab", activeTab);
+    if (selectedDept === "All") params.delete("dept"); else params.set("dept", selectedDept);
+    if (!searchQuery) params.delete("q"); else params.set("q", searchQuery);
     const qs = params.toString();
     const next = `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`;
-    window.history.replaceState(null, "", next);
-  }, [selectedDept]);
+    if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(null, "", next);
+    }
+  }, [activeTab, selectedDept, searchQuery]);
+
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [directorySearch, setDirectorySearch] = useState("");
@@ -508,7 +518,7 @@ export default function Dashboard() {
 
             {activeTab === "team" && (
               <>
-                <TeamBreakdown employees={filteredEmployees} dates={dates} selectedDept={selectedDept} selectedDate={selectedDate} />
+                <TeamBreakdown employees={filteredEmployees} dates={dates} selectedDept={selectedDept} />
                 <div className="card p-5">
                   {(() => {
                     const q = directorySearch.trim().toLowerCase();

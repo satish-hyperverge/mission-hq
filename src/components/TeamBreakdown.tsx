@@ -4,7 +4,7 @@ import { Employee } from "@/lib/types";
 import StatusBadge from "./StatusBadge";
 import React, { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Users } from "lucide-react";
-import { startOfMonth, endOfMonth, parseISO, format } from "date-fns";
+import { startOfMonth, endOfMonth, startOfWeek, addDays, parseISO, format } from "date-fns";
 
 type ViewMode = "week" | "month";
 
@@ -12,10 +12,9 @@ interface Props {
   employees: Employee[];
   dates: string[];
   selectedDept: string;
-  selectedDate: string;
 }
 
-export default function TeamBreakdown({ employees, dates, selectedDept, selectedDate }: Props) {
+export default function TeamBreakdown({ employees, dates, selectedDept }: Props) {
   const filtered = selectedDept === "All"
     ? employees
     : employees.filter((e) => e.departments.includes(selectedDept));
@@ -24,13 +23,34 @@ export default function TeamBreakdown({ employees, dates, selectedDept, selected
   const todayStr = format(today, "yyyy-MM-dd");
 
   const [viewMode, setViewMode] = useState<ViewMode>("week");
-  const [page, setPage] = useState(0);
 
-  const allPastDates = dates.filter((d) => d <= selectedDate);
-  const daysPerPage = 5;
-  const totalPages = Math.max(1, Math.ceil(allPastDates.length / daysPerPage));
-  const currentPage = Math.min(page, totalPages - 1);
-  const weekDates = allPastDates.slice(-(currentPage + 1) * daysPerPage, allPastDates.length - currentPage * daysPerPage);
+  // ── Week navigation (Mon–Fri, like DailyTrendChart) ─────────
+  const thisMonday = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), [today]);
+  const thisMondayKey = format(thisMonday, "yyyy-MM-dd");
+
+  const earliestMondayKey = useMemo(() => {
+    if (dates.length === 0) return thisMondayKey;
+    const sorted = [...dates].sort();
+    const earliest = parseISO(sorted[0]);
+    return format(startOfWeek(earliest, { weekStartsOn: 1 }), "yyyy-MM-dd");
+  }, [dates, thisMondayKey]);
+
+  const [viewedMondayKey, setViewedMondayKey] = useState(thisMondayKey);
+  const viewedMonday = useMemo(() => parseISO(viewedMondayKey), [viewedMondayKey]);
+
+  const prevMondayKey = viewedMondayKey > earliestMondayKey
+    ? format(addDays(viewedMonday, -7), "yyyy-MM-dd")
+    : null;
+  const nextMondayKey = viewedMondayKey < thisMondayKey
+    ? format(addDays(viewedMonday, 7), "yyyy-MM-dd")
+    : null;
+  const isCurrentWeek = viewedMondayKey === thisMondayKey;
+
+  // Mon–Fri date strings for the viewed week (always 5 cols, future days render as "—")
+  const weekDates = useMemo(
+    () => Array.from({ length: 5 }, (_, i) => format(addDays(viewedMonday, i), "yyyy-MM-dd")),
+    [viewedMonday]
+  );
 
   // Months that have at least one date in the dataset
   const monthsWithData = useMemo(() => {
@@ -58,8 +78,9 @@ export default function TeamBreakdown({ employees, dates, selectedDept, selected
   const prevMonthKey = monthIdx > 0 ? monthsWithData[monthIdx - 1] : null;
   const nextMonthKey = monthIdx >= 0 && monthIdx < monthsWithData.length - 1 ? monthsWithData[monthIdx + 1] : null;
 
-  // Reverse so latest date renders as the first (leftmost) column
-  const pastDates = (viewMode === "month" ? monthDates : weekDates).slice().reverse();
+  // Week: Mon → Fri left-to-right (matches Daily Attendance Trend).
+  // Month: latest date first (leftmost), as before.
+  const pastDates = viewMode === "month" ? monthDates.slice().reverse() : weekDates;
 
   const grouped = useMemo(() => {
     const map: Record<string, Employee[]> = {};
@@ -106,32 +127,36 @@ export default function TeamBreakdown({ employees, dates, selectedDept, selected
           {viewMode === "week" ? (
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setPage(Math.min(currentPage + 1, totalPages - 1))}
-                disabled={currentPage >= totalPages - 1}
+                onClick={() => prevMondayKey && setViewedMondayKey(prevMondayKey)}
+                disabled={!prevMondayKey}
                 className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{ color: "var(--text-muted)" }}
-                aria-label="Older week"
+                aria-label="Previous week"
               >
                 <ChevronLeft size={15} />
               </button>
-              <span className="text-[11px] min-w-[90px] text-center font-mono" style={{ color: "var(--text-muted)" }}>
-                {pastDates.length > 0 && (
-                  <>
-                    {new Date(pastDates[pastDates.length - 1] + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                    {" – "}
-                    {new Date(pastDates[0] + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                  </>
-                )}
+              <span className="text-[11px] min-w-[120px] text-center font-semibold tabular-nums" style={{ color: "var(--text-primary)" }}>
+                {format(parseISO(weekDates[0]), "MMM d")} – {format(parseISO(weekDates[4]), "MMM d")}
               </span>
               <button
-                onClick={() => setPage(Math.max(currentPage - 1, 0))}
-                disabled={currentPage <= 0}
+                onClick={() => nextMondayKey && setViewedMondayKey(nextMondayKey)}
+                disabled={!nextMondayKey}
                 className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{ color: "var(--text-muted)" }}
-                aria-label="Newer week"
+                aria-label="Next week"
               >
                 <ChevronRight size={15} />
               </button>
+              {!isCurrentWeek && (
+                <button
+                  onClick={() => setViewedMondayKey(thisMondayKey)}
+                  className="ml-1 px-2 py-1 text-[10px] font-bold rounded-md transition-all"
+                  style={{ background: "var(--bg-inset)", color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
+                  aria-label="Jump to this week"
+                >
+                  This Week
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-1">
