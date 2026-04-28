@@ -12,6 +12,7 @@ import TeamBreakdown from "@/components/TeamBreakdown";
 import EmployeeDetail from "@/components/EmployeeDetail";
 import { DailyTrendChart, StatusPieChart, TeamComplianceChart, WeeklyOfficeTrend } from "@/components/Charts";
 import WeeklyOfficeCompliance from "@/components/WeeklyOfficeCompliance";
+import LoadingScreen from "@/components/LoadingScreen";
 import {
   MapPin, BarChart3, Users, ShieldCheck, Download, Sun, Moon, TrendingUp,
   RefreshCw, AlertCircle, Clock, AlertTriangle, Search, X, Command,
@@ -242,102 +243,8 @@ export default function Dashboard() {
     { id: "trends", label: "Trends", icon: <TrendingUp size={16} /> },
   ];
 
-  // ─── Loading Skeleton (matches real UI layout) ─────────
-  // Only show skeleton after client mount to avoid hydration mismatch
-  if (!mounted || loading) {
-    const S = ({ className }: { className: string }) => <div className={`shimmer-bar ${className}`} />;
-    return (
-      <div className="min-h-screen" style={{ background: "var(--bg-app)" }}>
-        {/* Header skeleton */}
-        <header className="glass border-b" style={{ borderColor: "var(--border-default)" }}>
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
-                <MapPin size={16} className="text-white" />
-              </div>
-              <div>
-                <div className="text-[15px] font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>MissionHQ</div>
-                <S className="h-3 w-28 rounded mt-1" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <S className="h-8 w-28 rounded-lg hidden sm:block" />
-              <S className="h-8 w-8 rounded-lg" />
-              <S className="h-8 w-8 rounded-lg" />
-              <S className="h-8 w-20 rounded-lg hidden sm:block" />
-            </div>
-          </div>
-          {/* Tabs skeleton */}
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 pb-2">
-            <div className="flex gap-3">
-              {["w-20", "w-24", "w-24", "w-16"].map((w, i) => <S key={i} className={`h-5 ${w} rounded`} />)}
-            </div>
-          </div>
-        </header>
-
-        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 space-y-5">
-          {/* Filter bar skeleton */}
-          <div className="card p-3.5">
-            <div className="flex flex-wrap items-center gap-3">
-              <S className="h-4 w-12 rounded" />
-              <S className="h-9 w-48 rounded-lg flex-1" />
-              <S className="h-9 w-36 rounded-lg" />
-              <S className="h-9 w-40 rounded-lg" />
-            </div>
-          </div>
-
-          {/* Stats heading skeleton */}
-          <div className="flex items-center justify-between">
-            <div><S className="h-4 w-32 rounded mb-1.5" /><S className="h-3 w-48 rounded" /></div>
-            <S className="h-14 w-64 rounded-2xl hidden sm:block" />
-          </div>
-
-          {/* Stat cards skeleton */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="card p-3.5">
-                <S className="h-7 w-7 rounded-lg mb-2.5" />
-                <S className="h-5 w-10 rounded mb-1.5" />
-                <S className="h-3 w-14 rounded" />
-              </div>
-            ))}
-          </div>
-
-          {/* Streak bar skeleton */}
-          <div className="card p-5">
-            <div className="flex items-center gap-2.5 mb-4">
-              <S className="h-8 w-8 rounded-lg" />
-              <div><S className="h-4 w-28 rounded mb-1" /><S className="h-3 w-48 rounded" /></div>
-            </div>
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg" style={{ background: "var(--bg-inset)" }}>
-                  <S className="h-5 w-5 rounded" />
-                  <S className="h-7 w-7 rounded-lg" />
-                  <div className="flex-1"><S className="h-3.5 w-28 rounded mb-1" /><S className="h-3 w-20 rounded" /></div>
-                  <S className="h-4 w-16 rounded" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Charts skeleton */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div className="lg:col-span-2 card p-5">
-              <S className="h-4 w-40 rounded mb-1" />
-              <S className="h-3 w-32 rounded mb-4" />
-              <S className="h-[260px] w-full rounded-lg" />
-            </div>
-            <div className="card p-5">
-              <S className="h-4 w-36 rounded mb-1" />
-              <S className="h-3 w-28 rounded mb-4" />
-              <S className="h-[200px] w-full rounded-lg" />
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // ─── Loading: Mission Control acquiring signal ─────────
+  if (!mounted || loading) return <LoadingScreen />;
 
   // ─── Error ────────────────────────────────────────────
   if (error) {
