@@ -260,14 +260,15 @@ export default function TeamBreakdown({ employees, dates, selectedDept }: Props)
       <div className="overflow-auto scrollbar-thin rounded-lg border" style={{ borderColor: "var(--border-subtle)", maxHeight: 680 }}>
         <table className="w-full text-sm border-separate border-spacing-0">
           <thead>
-            <tr style={{ background: "var(--bg-surface-secondary)" }}>
+            <tr>
               <th
-                className="text-left py-2.5 px-3 font-medium sticky left-0 w-[300px] min-w-[300px] z-20"
+                className="text-left py-2.5 px-3 font-medium sticky top-0 left-0 w-[300px] min-w-[300px] z-30"
                 style={{
                   background: "var(--bg-surface-secondary)",
                   borderRight: "1px solid var(--border-default)",
                   color: "var(--text-secondary)",
                   borderBottom: "1px solid var(--border-default)",
+                  boxShadow: "0 1px 0 0 var(--border-default)",
                 }}
               >
                 Employee
@@ -275,8 +276,13 @@ export default function TeamBreakdown({ employees, dates, selectedDept }: Props)
               {pastDates.map((d) => (
                 <th
                   key={d}
-                  className="text-center py-2.5 px-3 font-medium min-w-[110px]"
-                  style={{ color: "var(--text-secondary)", borderBottom: "1px solid var(--border-default)" }}
+                  className="text-center py-2.5 px-3 font-medium min-w-[110px] sticky top-0 z-20"
+                  style={{
+                    background: "var(--bg-surface-secondary)",
+                    color: "var(--text-secondary)",
+                    borderBottom: "1px solid var(--border-default)",
+                    boxShadow: "0 1px 0 0 var(--border-default)",
+                  }}
                 >
                   <div className="text-xs">{new Date(d + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" })}</div>
                   <div className="text-[10px] font-normal" style={{ color: "var(--text-muted)" }}>
